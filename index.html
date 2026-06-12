@@ -352,6 +352,12 @@
     <button id="btnStart" class="primary">▶ スタート</button>
     <button id="btnRestart">↺ やりなおし</button>
     <button id="btnSound" title="効果音のON/OFF">🔊 音あり</button>
+    <label class="pref" title="文字の出方の解釈。『US互換』= OSがUS設定で変換なし、またはOSがJIS設定でファームウェアがUS刻印通りに変換する場合。『JIS互換』= OSがJIS設定で変換なし、またはOSがUS設定でファームウェアがJIS刻印通りに変換する場合">配列
+      <select id="selOut">
+        <option value="us">US互換</option>
+        <option value="jis">JIS互換</option>
+      </select>
+    </label>
     <label class="pref" title="同じ文字を複数の方法で入力できる場合に、どの打ち方を案内するか">入力案内
       <select id="selPref">
         <option value="auto">自動（おすすめ）</option>
@@ -575,6 +581,27 @@ const HID_CHARS = {};
   const kp = "1234567890";
   for (let i = 0; i < 10; i++) HID_CHARS[0x59 + i] = [kp[i], kp[i]];
 })();
+
+// JIS interpretation (OS set to JIS *without* firmware US-conversion)
+const HID_CHARS_JIS = {
+  0x1F: ["2", '"'], 0x23: ["6", "&"], 0x24: ["7", "'"], 0x25: ["8", "("],
+  0x26: ["9", ")"], 0x27: ["0", ""],
+  0x2D: ["-", "="], 0x2E: ["^", "~"], 0x2F: ["@", "`"], 0x30: ["[", "{"],
+  0x31: ["]", "}"], 0x32: ["]", "}"], 0x33: [";", "+"], 0x34: [":", "*"],
+  0x87: ["\\", "_"],   // INT1 ろ
+  0x89: ["\\", "|"]    // INT3 ¥
+};
+// "us" = output matches US legends (OS=US plain, or OS=JIS + firmware US-conversion)
+// "jis" = output matches JIS legends (OS=JIS plain, or OS=US + firmware JIS-conversion)
+let outMode = "us";
+try { if (localStorage.getItem("cornixOutMode") === "jis") outMode = "jis"; } catch (e) {}
+function charsOf(code) {
+  if (outMode === "jis") {
+    if (code in HID_CHARS_JIS) return HID_CHARS_JIS[code];
+    if (code === 0x35) return undefined;   // JIS: 半角/全角 — no character output
+  }
+  return HID_CHARS[code];
+}
 
 // labels for non-character HID codes
 const KEYLABELS = {
@@ -918,7 +945,7 @@ function findKeyForChar(ch) {
       if (L > 0 && (raw.t === "trans" || raw.t === "none")) continue;
       const tap = tapOf(raw);
       if (!tap) continue;
-      const chars = HID_CHARS[tap.code];
+      const chars = charsOf(tap.code);
       if (!chars) continue;
       let needShift = null;
       if (modsHaveShift(tap.mods) || lkShift) { if (chars[1] === ch) needShift = false; }
@@ -961,7 +988,7 @@ function legendFor(k) {
     case "none": return "";
     case "trans": return "▽";
     case "kc": {
-      const ch = HID_CHARS[k.code];
+      const ch = charsOf(k.code);
       if (ch) {
         const c = modsHaveShift(k.mods) ? ch[1] : ch[0];
         if (c === " ") return "Space";
@@ -1021,7 +1048,7 @@ function renderKeyboard() {
 function shiftedSub(k) {
   const tap = tapOf(k);
   if (!tap || tap.mods) return "";
-  const chars = HID_CHARS[tap.code];
+  const chars = charsOf(tap.code);
   if (!chars || chars[0] === chars[1]) return "";
   if (/^[a-z]$/.test(chars[0])) return "";   // A-Z: obvious, keep keycaps clean
   return chars[1];
@@ -1873,6 +1900,14 @@ $("btnDefDl").addEventListener("click", () => {
 $("btnStart").addEventListener("click", () => engine.start());
 $("btnRestart").addEventListener("click", () => engine.idle());
 $("btnAgain").addEventListener("click", () => { $("resultDlg").close(); engine.start(); });
+$("selOut").value = outMode;
+$("selOut").addEventListener("change", () => {
+  outMode = $("selOut").value;
+  try { localStorage.setItem("cornixOutMode", outMode); } catch (e) {}
+  charCache.clear();
+  updateLegends();
+  engine.refreshHint();
+});
 $("selPref").value = keyPref.v;
 $("selPref").addEventListener("change", () => {
   keyPref.v = $("selPref").value;
