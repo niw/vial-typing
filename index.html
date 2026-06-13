@@ -115,23 +115,38 @@
   }
 
   /* ---- mode tabs & stats ---- */
-  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-  .modes { display: flex; gap: 6px; }
+  .toolbar { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; }
+  /* 「練習モード」「プレイ時間」「設定」のラベル付きグループ */
+  .ctrl-group { display: flex; flex-direction: column; gap: 4px; }
+  .ctrl-label { font-size: 11px; font-weight: 700; letter-spacing: .5px; color: var(--dim); }
+  .ctrl-group.settings { margin-left: auto; }
+  .settings-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .modes { display: flex; gap: 5px; }
+  .times { display: flex; gap: 5px; }
+  .modes button, .times button { padding: 5px 11px; font-size: 11.5px; box-shadow: 0 2px 0 var(--border); }
   .modes button.active {
     background: linear-gradient(90deg, var(--accent2), #9d8ffa);
     border-color: var(--accent2); color: #fff;
-    box-shadow: 0 3px 0 #5e4fd4;
+    box-shadow: 0 2px 0 #5e4fd4;
   }
-  .times { display: flex; gap: 6px; margin-right: auto; }
   .times button.active {
     background: linear-gradient(90deg, #18b566, #4dd694);
     border-color: #18b566; color: #fff;
-    box-shadow: 0 3px 0 #0e8a4c;
+    box-shadow: 0 2px 0 #0e8a4c;
   }
-  .stats { display: flex; gap: 14px; font-size: 13px; color: var(--dim); align-items: center; }
-  .stats b { color: var(--accent2); font-size: 17px; }
-  #stTimeWrap { position: relative; }
-  #stTime { font-size: 20px; color: var(--accent); }
+  /* ステータスは枠なしで大きく見やすく、中央揃え */
+  .statbar {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center;
+    gap: 8px 28px; margin-bottom: 16px; padding: 2px 4px;
+  }
+  .statbar .stat { text-align: center; }
+  .statbar .stat .lbl {
+    display: block; font-size: 11px; font-weight: 700;
+    letter-spacing: .5px; color: var(--dim); margin-bottom: 1px;
+  }
+  .statbar .stat b { display: block; font-size: 30px; font-weight: 800; line-height: 1.1; color: var(--accent2); }
+  .statbar .stat.time { position: relative; }
+  .statbar .stat.time b { color: var(--accent); font-size: 36px; }
   #stTime.low { color: var(--bad); animation: blink .6s ease-in-out infinite; }
   .bonus-pop {
     position: absolute; left: 50%; top: -8px; transform: translateX(-50%);
@@ -165,6 +180,25 @@
   }
   #typeline .cur.miss { background: var(--bad); }
   #typeline .rest { color: #c4bbcf; }
+  /* 3-2-1 カウントダウン */
+  #typeline .countdown {
+    display: inline-block; font-size: 72px; font-weight: 800; line-height: 1;
+    color: var(--accent); animation: cd-pop .35s ease-out;
+  }
+  #typeline .countdown.go { color: var(--good); }
+  @keyframes cd-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  /* アイドル時の大きなスタート案内（クリックでも開始） */
+  #typeline.idle { cursor: pointer; padding: 22px 8px; }
+  #typeline .start-prompt {
+    display: inline-block; font-size: 30px; font-weight: 800; letter-spacing: 1px; color: #fff;
+    background: linear-gradient(90deg, var(--accent), #ff8fb0);
+    border-radius: 999px; padding: 16px 60px; box-shadow: 0 5px 0 #d94a78;
+    animation: cd-pop .3s ease-out, breathe 1.8s ease-in-out infinite .3s;
+  }
+  #typeline.idle:hover .start-prompt { transform: translateY(-2px); box-shadow: 0 7px 0 #d94a78; }
+  #typeline.idle:active .start-prompt { transform: translateY(2px); box-shadow: 0 2px 0 #d94a78; }
+  #typeline .start-sub { display: block; margin-top: 14px; font-size: 13px; letter-spacing: 0; color: var(--dim); }
+  @keyframes breathe { 50% { filter: brightness(1.08); transform: scale(1.015); } }
   @keyframes blink { 50% { filter: brightness(1.35); } }
   #hint { text-align: center; min-height: 24px; margin-top: 10px; font-size: 14px; color: var(--dim); }
   #hint .chip {
@@ -315,7 +349,51 @@
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   .result-grid span { font-size: 11px; color: var(--dim); }
-  @media (max-width: 640px) { .result-grid { grid-template-columns: repeat(3, 1fr); } }
+  /* ===== スマホ向けレスポンシブ ===== */
+  @media (max-width: 640px) {
+    body { padding: 10px 8px 32px; }
+    header { gap: 8px; margin-bottom: 10px; }
+    header h1 { font-size: 18px; }
+    header .sub { display: none; }
+    #status { order: 5; width: 100%; text-align: center; }
+    header button { flex: 1 1 40%; font-size: 12px; padding: 8px 10px; }
+
+    .panel { padding: 12px; border-radius: 16px; margin-bottom: 12px; }
+    .toolbar { gap: 10px 14px; align-items: flex-start; }
+    .ctrl-group.settings { margin-left: 0; }
+    .ctrl-label { font-size: 10px; }
+    .modes button, .times button { padding: 5px 9px; font-size: 11px; }
+    .pref { font-size: 11px; }
+    .pref select { padding: 5px 8px; font-size: 12px; }
+
+    .statbar { gap: 6px 16px; margin-bottom: 12px; }
+    .statbar .stat .lbl { font-size: 10px; }
+    .statbar .stat b { font-size: 22px; }
+    .statbar .stat.time b { font-size: 26px; }
+
+    #wordMeta { min-height: 36px; }
+    #wordMeta .jp { font-size: 26px; }
+    #typeline { font-size: 25px; padding: 12px 6px; }
+    #typeline .start-prompt { font-size: 21px; padding: 12px 30px; }
+    #typeline .countdown { font-size: 52px; }
+    #typeline.idle { padding: 16px 6px; }
+
+    .legend { gap: 8px 12px; font-size: 11px; }
+    .kb-head .title { font-size: 12px; }
+
+    dialog { padding: 18px 16px; border-radius: 18px; }
+    .score-hero { gap: 12px; }
+    .score-hero .rank { width: 52px; height: 52px; font-size: 28px; }
+    .score-hero .num { font-size: 44px; }
+    .result-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .result-grid b { font-size: 20px; }
+  }
+  @media (max-width: 380px) {
+    .statbar { gap: 4px 12px; }
+    .statbar .stat b { font-size: 19px; }
+    .statbar .stat.time b { font-size: 22px; }
+    #typeline { font-size: 22px; }
+  }
 </style>
 </head>
 <body>
@@ -326,51 +404,61 @@
   <div id="status">キーボード未読込</div>
   <button id="btnConnect" class="primary">🔌 キーボードから読み取る</button>
   <button id="btnVil">📄 .vilを開く</button>
+  <button id="btnForget" title="保存したレイアウト・キーマップを消して未読込に戻す" hidden>🗑 保存を消す</button>
   <input type="file" id="vilFile" accept=".vil,application/json" hidden>
 </header>
 
 <section class="panel">
   <div class="toolbar">
-    <div class="modes">
-      <button data-mode="en" class="active">英単語・英文</button>
-      <button data-mode="jp">日本語ローマ字</button>
-      <button data-mode="sym">記号・レイヤー</button>
-      <button data-mode="mix">ミックス</button>
+    <div class="ctrl-group">
+      <span class="ctrl-label">練習モード</span>
+      <div class="modes">
+        <button data-mode="en" class="active">英単語・英文</button>
+        <button data-mode="jp">日本語ローマ字</button>
+        <button data-mode="sym">記号・レイヤー</button>
+        <button data-mode="mix">ミックス</button>
+      </div>
     </div>
-    <div class="times">
-      <button data-time="30">30秒</button>
-      <button data-time="60" class="active">60秒</button>
-      <button data-time="90">90秒</button>
+    <div class="ctrl-group">
+      <span class="ctrl-label">プレイ時間</span>
+      <div class="times">
+        <button data-time="30">30秒</button>
+        <button data-time="60" class="active">60秒</button>
+        <button data-time="90">90秒</button>
+      </div>
     </div>
-    <div class="stats">
-      <div id="stTimeWrap">残り時間 <b id="stTime">60.0</b></div>
-      <div>WPM <b id="stWpm">0</b></div>
-      <div>正確率 <b id="stAcc">100%</b></div>
-      <div>コンボ <b id="stCombo">0</b></div>
-      <div>ミス <b id="stMiss">0</b></div>
+    <div class="ctrl-group settings">
+      <span class="ctrl-label">設定</span>
+      <div class="settings-row">
+        <button id="btnSound" title="効果音のON/OFF">🔊 音あり</button>
+        <label class="pref" title="文字の出方の解釈。『US互換』= OSがUS設定で変換なし、またはOSがJIS設定でファームウェアがUS刻印通りに変換する場合。『JIS互換』= OSがJIS設定で変換なし、またはOSがUS設定でファームウェアがJIS刻印通りに変換する場合">配列
+          <select id="selOut">
+            <option value="us">US互換</option>
+            <option value="jis">JIS互換</option>
+          </select>
+        </label>
+        <label class="pref" title="同じ文字を複数の方法で入力できる場合に、どの打ち方を案内するか">入力案内
+          <select id="selPref">
+            <option value="auto">自動（おすすめ）</option>
+            <option value="shift">Shift優先</option>
+            <option value="layer">レイヤー優先</option>
+          </select>
+        </label>
+        <label class="pref" title="数字をどのレイヤーで打つかを固定する">数字
+          <select id="selNumLayer"></select>
+        </label>
+        <label class="pref" title="記号をどのレイヤーで打つかを固定する">記号
+          <select id="selSymLayer"></select>
+        </label>
+      </div>
     </div>
-    <button id="btnStart" class="primary">▶ スタート</button>
-    <button id="btnRestart">↺ やりなおし</button>
-    <button id="btnSound" title="効果音のON/OFF">🔊 音あり</button>
-    <label class="pref" title="文字の出方の解釈。『US互換』= OSがUS設定で変換なし、またはOSがJIS設定でファームウェアがUS刻印通りに変換する場合。『JIS互換』= OSがJIS設定で変換なし、またはOSがUS設定でファームウェアがJIS刻印通りに変換する場合">配列
-      <select id="selOut">
-        <option value="us">US互換</option>
-        <option value="jis">JIS互換</option>
-      </select>
-    </label>
-    <label class="pref" title="同じ文字を複数の方法で入力できる場合に、どの打ち方を案内するか">入力案内
-      <select id="selPref">
-        <option value="auto">自動（おすすめ）</option>
-        <option value="shift">Shift優先</option>
-        <option value="layer">レイヤー優先</option>
-      </select>
-    </label>
-    <label class="pref" title="数字をどのレイヤーで打つかを固定する">数字
-      <select id="selNumLayer"></select>
-    </label>
-    <label class="pref" title="記号をどのレイヤーで打つかを固定する">記号
-      <select id="selSymLayer"></select>
-    </label>
+  </div>
+  <div class="statbar">
+    <div class="stat time" id="stTimeWrap"><span class="lbl">残り時間</span><b id="stTime">60.0</b></div>
+    <div class="stat"><span class="lbl">WPM</span><b id="stWpm">0</b></div>
+    <div class="stat"><span class="lbl">正確率</span><b id="stAcc">100%</b></div>
+    <div class="stat"><span class="lbl">コンボ</span><b id="stCombo">0</b></div>
+    <div class="stat"><span class="lbl">ミス</span><b id="stMiss">0</b></div>
   </div>
   <div id="wordMeta"></div>
   <div id="typeline" class="mono"></div>
@@ -576,7 +664,7 @@ const HID_CHARS = {};
     0x31: ["\\", "|"], 0x32: ["#", "~"], 0x33: [";", ":"], 0x34: ["'", '"'],
     0x35: ["`", "~"], 0x36: [",", "<"], 0x37: [".", ">"], 0x38: ["/", "?"],
     0x54: ["/", "/"], 0x55: ["*", "*"], 0x56: ["-", "-"], 0x57: ["+", "+"],
-    0x58: ["\n", "\n"], 0x63: [".", "."]
+    0x58: ["\n", "\n"], 0x63: [".", "."], 0x67: ["=", "="]
   });
   const kp = "1234567890";
   for (let i = 0; i < 10; i++) HID_CHARS[0x59 + i] = [kp[i], kp[i]];
@@ -613,7 +701,8 @@ const KEYLABELS = {
   0xE4: "Ctrl", 0xE5: "Shift", 0xE6: "Alt", 0xE7: "GUI",
   0x35: "半/全", 0x88: "かな", 0x8A: "変換", 0x8B: "無変換"
 };
-for (let i = 0; i < 24; i++) KEYLABELS[0x3A + i] = "F" + (i + 1);
+for (let i = 0; i < 12; i++) KEYLABELS[0x3A + i] = "F" + (i + 1);   // F1-F12
+for (let i = 0; i < 12; i++) KEYLABELS[0x68 + i] = "F" + (i + 13);  // F13-F24 (HID 0x68-0x73)
 
 const MOD_BITS = { CTL: 1, SFT: 2, ALT: 4, GUI: 8 };
 const modsHaveShift = m => !!(m & 0x02);
@@ -648,6 +737,7 @@ const KC_NAMES = {};
     KP_SLASH: 0x54, PSLS: 0x54, KP_ASTERISK: 0x55, PAST: 0x55,
     KP_MINUS: 0x56, PMNS: 0x56, KP_PLUS: 0x57, PPLS: 0x57,
     KP_ENTER: 0x58, PENT: 0x58, KP_DOT: 0x63, PDOT: 0x63,
+    KP_EQUAL: 0x67, PEQL: 0x67, KP_EQUAL_AS400: 0x86,
     APPLICATION: 0x65, APP: 0x65, NONUS_BSLASH: 0x64, NUBS: 0x64,
     LCTRL: 0xE0, LCTL: 0xE0, LEFT_CTRL: 0xE0, LSHIFT: 0xE1, LSFT: 0xE1,
     LEFT_SHIFT: 0xE1, LALT: 0xE2, LEFT_ALT: 0xE2, LOPT: 0xE2,
@@ -659,7 +749,8 @@ const KC_NAMES = {};
     YEN: 0x89, INT4: 0x8A, HENK: 0x8A, INT5: 0x8B, MHEN: 0x8B
   };
   for (const [n, c] of Object.entries(alias)) KC_NAMES["KC_" + n] = c;
-  for (let i = 1; i <= 24; i++) KC_NAMES["KC_F" + i] = 0x3A + i - 1;
+  for (let i = 1; i <= 12; i++) KC_NAMES["KC_F" + i] = 0x3A + i - 1;   // F1-F12
+  for (let i = 13; i <= 24; i++) KC_NAMES["KC_F" + i] = 0x68 + i - 13; // F13-F24 (HID 0x68-0x73)
   for (let i = 1; i <= 9; i++) { KC_NAMES["KC_KP_" + i] = 0x58 + i; KC_NAMES["KC_P" + i] = 0x58 + i; }
   KC_NAMES["KC_KP_0"] = 0x62; KC_NAMES["KC_P0"] = 0x62;
 })();
@@ -811,16 +902,75 @@ const SHIFTED_ALIAS = {
   KC_PIPE: "LSFT(KC_BSLS)", KC_COLN: "LSFT(KC_SCLN)", KC_DQUO: "LSFT(KC_QUOT)",
   KC_LABK: "LSFT(KC_COMM)", KC_RABK: "LSFT(KC_DOT)", KC_QUES: "LSFT(KC_SLSH)"
 };
-function setKeymap(layers, source, label) {
-  KB.layers = layers; KB.layerCount = layers.length; KB.source = source;
+const KEYMAP_STORE_KEY = "vialTypingKeymap";
+
+function setKeymap(layers, source, label, restored) {
+  KB.layers = layers; KB.layerCount = layers.length; KB.source = source; KB.label = label || "";
   charCache.clear();
   buildLayerTabs();
   rebuildLayerSelects();
   setViewLayer(0);
   const st = document.getElementById("status");
   if (source === "sample") { st.className = ""; st.textContent = "キーマップ未読込（サンプル表示中）"; }
-  else { st.className = "ok"; st.textContent = "✓ " + label + "（" + layers.length + "レイヤー）"; }
+  else {
+    st.className = "ok";
+    st.textContent = "✓ " + label + "（" + layers.length + "レイヤー）" + (restored ? " · 前回のキーマップを復元" : "");
+    // 実際に読み込んだレイアウト+キーマップをブラウザに保存し、次回自動復元する
+    if (!restored) saveKeymap(layers, source, label);
+  }
+  updateForgetBtn();
   engine && engine.refreshHint();
+}
+
+// 直近のレイアウト定義＋キーマップをlocalStorageへ保存
+function saveKeymap(layers, source, label) {
+  try {
+    localStorage.setItem(KEYMAP_STORE_KEY, JSON.stringify({
+      v: 1, source, label,
+      matrixRows: MATRIX_ROWS, matrixCols: MATRIX_COLS,
+      physKeys: PHYS_KEYS, kbName: KBDEF.name, layers
+    }));
+  } catch (e) { /* 容量超過/プライベートモード等は無視 */ }
+}
+
+// 保存済みレイアウト＋キーマップを復元（成功時true）
+function restoreSavedKeymap() {
+  try {
+    const raw = localStorage.getItem(KEYMAP_STORE_KEY);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (!d || !Array.isArray(d.layers) || !d.layers.length ||
+        !Array.isArray(d.physKeys) || !d.physKeys.length) return false;
+    MATRIX_ROWS = d.matrixRows || MATRIX_ROWS;
+    MATRIX_COLS = d.matrixCols || MATRIX_COLS;
+    PHYS_KEYS = d.physKeys;
+    KBDEF.name = d.kbName || d.label || "Keyboard";
+    renderKeyboard();
+    setKeymap(d.layers, d.source || "vil", d.label || "保存済みキーマップ", true);
+    return true;
+  } catch (e) { return false; }
+}
+
+// 保存済みを破棄して未読込状態に戻す
+function forgetSavedKeymap() {
+  try { localStorage.removeItem(KEYMAP_STORE_KEY); } catch (e) {}
+  KB.layers = []; KB.layerCount = 0; KB.source = "sample"; KB.label = "";
+  charCache.clear();
+  showKbPlaceholder();
+  buildLayerTabs(); rebuildLayerSelects();
+  const st = document.getElementById("status");
+  st.className = ""; st.textContent = "キーボード未読込";
+  updateForgetBtn();
+  engine && engine.idle();
+}
+
+// 「保存を消す」ボタンは保存済みキーマップがあるときだけ表示
+function updateForgetBtn() {
+  const b = document.getElementById("btnForget");
+  if (!b) return;
+  let has = false;
+  try { has = !!localStorage.getItem(KEYMAP_STORE_KEY); } catch (e) {}
+  b.hidden = !has;
 }
 
 function loadSample() {
@@ -945,6 +1095,8 @@ function findKeyForChar(ch) {
       if (L > 0 && (raw.t === "trans" || raw.t === "none")) continue;
       const tap = tapOf(raw);
       if (!tap) continue;
+      // Ctrl/Alt/GUI付きのキーはショートカット(例: LSG(4)=Sft+GUI+4)であり文字入力ではない
+      if (tap.mods & 0x0D) continue;
       const chars = charsOf(tap.code);
       if (!chars) continue;
       let needShift = null;
@@ -990,12 +1142,19 @@ function legendFor(k) {
     case "kc": {
       const ch = charsOf(k.code);
       if (ch) {
+        // Shift以外の修飾(Ctrl/Alt/GUI)が付くキーはショートカット扱い:
+        // 全修飾(Shiftを含む) + シフト前のベースキー を表示する (例: LSG(3) -> Sft+GUI+3)
+        if (k.mods & 0x0D) {
+          const raw = ch[0];
+          const baseKey = raw === " " ? "Space" : raw === "\n" ? "⏎" : raw === "\t" ? "Tab"
+            : (/^[a-z]$/.test(raw) ? raw.toUpperCase() : raw);
+          return modsLabel(k.mods) + "+" + baseKey;
+        }
         const c = modsHaveShift(k.mods) ? ch[1] : ch[0];
         if (c === " ") return "Space";
         if (c === "\n") return "⏎";
         if (c === "\t") return "Tab";
-        const base = /^[a-z]$/.test(c) ? c.toUpperCase() : c;
-        return k.mods && !modsHaveShift(k.mods) ? modsLabel(k.mods) + "+" + base : base;
+        return /^[a-z]$/.test(c) ? c.toUpperCase() : c;
       }
       const lbl = KEYLABELS[k.code] || "0x" + k.code.toString(16);
       return k.mods ? modsLabel(k.mods) + "+" + lbl : lbl;
@@ -1016,7 +1175,6 @@ function legendFor(k) {
 }
 
 function renderKeyboard() {
-  const U = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--u")) || 52;
   kbEl.innerHTML = ""; keyEls.clear();
   let maxX = 0, maxY = 0, minX = 99, minY = 99;
   for (const k of PHYS_KEYS) {
@@ -1024,6 +1182,11 @@ function renderKeyboard() {
     minX = Math.min(minX, k.x); minY = Math.min(minY, k.y);
   }
   const pad = 0.25;
+  // キーボード全体がコンテナ幅に収まるようユニット(--u)を動的計算（最大52px）
+  const spanX = (maxX - minX + pad * 2) || 1;
+  const avail = (kbEl.parentElement && kbEl.parentElement.clientWidth) || 1000;
+  const U = Math.max(14, Math.min(52, avail / spanX));
+  document.documentElement.style.setProperty("--u", U + "px");
   kbEl.style.width = (maxX - minX + pad * 2) * U + "px";
   kbEl.style.height = (maxY - minY + pad * 2) * U + "px";
   for (const k of PHYS_KEYS) {
@@ -1304,6 +1467,7 @@ function loadVilText(text, name) {
   }
 }
 
+document.getElementById("btnForget").addEventListener("click", forgetSavedKeymap);
 document.getElementById("btnConnect").addEventListener("click", connectHID);
 document.getElementById("btnVil").addEventListener("click", () =>
   document.getElementById("vilFile").click());
@@ -1563,7 +1727,7 @@ const engine = {
   // stats
   correct: 0, miss: 0, startTime: 0, endTime: 0, missFlash: false,
   combo: 0, maxCombo: 0, words: 0, bonusTotal: 0, timerId: null,
-  hint: null, warn: "",
+  hint: null, warn: "", counting: false, countId: null,
 
   makeItem(mode) {
     mode = mode || this.mode;
@@ -1587,13 +1751,38 @@ const engine = {
   },
   fillItems(n) { for (let i = 0; i < n; i++) this.items.push(this.makeItem()); },
 
+  // 3-2-1 カウントダウンを表示してから本番開始
   start() {
+    if (this.counting) return;
     if (!KB.layerCount) {
       $("typeline").innerHTML =
         '<span class="rest" style="font-size:20px">⌨️ 先にキーボードを読み込んでください（「キーボードから読み取る」または vial.json / .vil をドロップ）</span>';
       return;
     }
     if ($("resultDlg").open) $("resultDlg").close();
+    clearInterval(this.timerId);
+    this.running = false; this.hint = null; this.items = [];
+    clearHighlights();
+    $("wordMeta").textContent = ""; $("queue").textContent = ""; $("hint").innerHTML = "";
+    $("stTime").textContent = runSeconds.toFixed(1); $("stTime").classList.remove("low");
+    $("stWpm").textContent = 0; $("stAcc").textContent = "100%";
+    $("stCombo").textContent = 0; $("stMiss").textContent = 0;
+    this.counting = true;
+    $("typeline").classList.remove("idle");
+    const show = (txt, go) =>
+      $("typeline").innerHTML = '<span class="countdown' + (go ? " go" : "") + '">' + txt + "</span>";
+    let n = 3;
+    show(n);
+    if (soundOn) audio.play("type");
+    this.countId = setInterval(() => {
+      n--;
+      if (n > 0) { show(n); if (soundOn) audio.play("type"); }
+      else if (n === 0) { show("GO!", true); if (soundOn) audio.play("bonus"); }
+      else { clearInterval(this.countId); this.counting = false; this.beginRun(); }
+    }, 700);
+  },
+
+  beginRun() {
     clearInterval(this.timerId);
     this.items = []; this.fillItems(20);
     this.idx = 0; this.correct = 0; this.miss = 0;
@@ -1608,10 +1797,15 @@ const engine = {
 
   idle() {
     clearInterval(this.timerId);
+    clearInterval(this.countId);
+    this.counting = false;
     this.running = false;
     this.items = []; this.hint = null;
     clearHighlights();
-    $("typeline").innerHTML = '<span class="rest" style="font-size:20px">▶ スタート（Space / Enter でも開始・プレイ中は ESC でこの画面に戻る）</span>';
+    $("typeline").classList.add("idle");
+    $("typeline").innerHTML =
+      '<span class="start-prompt">▶ スタート</span>' +
+      '<span class="start-sub">クリック / Space / Enter で開始　・　プレイ中は ESC で戻る</span>';
     $("wordMeta").textContent = ""; $("queue").textContent = ""; $("hint").innerHTML = "";
     $("stTime").textContent = runSeconds.toFixed(1); $("stTime").classList.remove("low");
     $("stWpm").textContent = 0; $("stAcc").textContent = "100%";
@@ -1855,10 +2049,11 @@ function escapeHtml(s) {
 document.addEventListener("keydown", e => {
   if ($("resultDlg").open) return;            // Esc closes the dialog natively
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key === "Escape") {                   // Esc during a run = back to the pre-start menu
-    if (engine.running) { e.preventDefault(); engine.idle(); }
+  if (e.key === "Escape") {                   // Esc during a run/countdown = back to the pre-start menu
+    if (engine.running || engine.counting) { e.preventDefault(); engine.idle(); }
     return;
   }
+  if (engine.counting) { e.preventDefault(); return; }  // ignore input during the 3-2-1 countdown
   if (!engine.running) {                      // Space / Enter starts a run
     if (e.key === " " || e.key === "Enter") { e.preventDefault(); engine.start(); }
     return;
@@ -1897,8 +2092,9 @@ $("btnDefDl").addEventListener("click", () => {
   a.download = "vial.json";
   a.click();
 });
-$("btnStart").addEventListener("click", () => engine.start());
-$("btnRestart").addEventListener("click", () => engine.idle());
+$("typeline").addEventListener("click", () => {   // アイドル中はタイピング欄クリックで開始
+  if (!engine.running && !engine.counting) engine.start();
+});
 $("btnAgain").addEventListener("click", () => { $("resultDlg").close(); engine.start(); });
 $("selOut").value = outMode;
 $("selOut").addEventListener("change", () => {
@@ -1931,9 +2127,21 @@ $("btnSound").addEventListener("click", () => {
 });
 
 /* ---------- startup ---------- */
-showKbPlaceholder();
+if (!restoreSavedKeymap()) showKbPlaceholder();   // 前回のレイアウト+キーマップがあれば自動復元
 updateSoundBtn();
 engine.idle();
+
+// ウィンドウ幅に合わせてキーボードを再フィット（キーマップ読込時のみ）
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (PHYS_KEYS.length && KB.layerCount) {
+      renderKeyboard();
+      if (engine && engine.hint) paintHint(engine.hint);
+    }
+  }, 120);
+});
 
 </script>
 </body>
