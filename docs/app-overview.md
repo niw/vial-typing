@@ -7,18 +7,19 @@ Vial Typing のアプリケーション本体。Vial 対応キーボードから
 
 ## データフロー
 
-```
-キーボード(WebHID) / .vil / vial.json ドロップ
-        │ 読み取り・デコード (§5, §2)
-        ▼
-  KB.layers（レイヤー別キーマップ）＋ PHYS_KEYS（物理配置）(§1, §3)
-        │ 逆引き: 文字 → キー＋Shift＋レイヤー (findKeyForChar §3)
-        ▼
-  練習エンジン engine (§6d) ── 出題 ← 練習データ data/*.json (§6b)
-        │                          ← ローマ字分解 tokenizeKana (§6a)
-        │                          ← キー習得モードの単語プール (§6c)
-        ├─ 画面描画: タイプライン・キーボードハイライト (§4)
-        └─ 走行結果 → キー習得モードの統計・解放判定・グラフ (§6c)
+```mermaid
+flowchart TD
+  hid["キーボード (WebHID)"] --> read["読み取り・デコード（§5, §2）"]
+  vil[".vil / vial.json ドロップ"] --> read
+  read --> km["KB.layers（レイヤー別キーマップ）+ PHYS_KEYS（物理配置）（§1, §3）"]
+  km --> lookup["逆引き findKeyForChar: 文字 → キー + Shift + レイヤー（§3）"]
+  lookup --> engine["練習エンジン engine（§6d）"]
+  data["練習データ data/*.json（§6b）"] --> engine
+  romaji["ローマ字分解 tokenizeKana（§6a）"] --> engine
+  pool["解放済みキーの単語プール（§6c）"] --> engine
+  engine --> render["タイプライン描画・キーボードハイライト（§4）"]
+  engine -- 走行結果 --> guided["キー習得モード: 統計・解放判定・グラフ（§6c）"]
+  guided --> pool
 ```
 
 ソース内のセクションコメント（`/* ---------- N. ... ---------- */`）に沿って構成は以下の通り。
@@ -105,6 +106,18 @@ keybr.com の guided lesson の移植。1 走行を 1 レッスンとして a-z 
 ## 6d. Engine — 練習エンジン
 
 `engine` オブジェクトが走行の全状態を持つステートマシン。
+
+```mermaid
+stateDiagram-v2
+  [*] --> 待機
+  待機 --> カウントダウン: クリック / Space / Enter（start）
+  カウントダウン --> 走行中: 3-2-1 → GO（beginRun）
+  カウントダウン --> 待機: Esc（idle）
+  走行中 --> 待機: Esc・時間制は記録を破棄（idle）
+  走行中 --> 結果表示: 残り時間0、無制限はEsc（finish）
+  結果表示 --> カウントダウン: もう一度
+  結果表示 --> 待機: Esc / ダイアログを閉じる
+```
 
 - 走行制御: `start()`（3-2-1 カウントダウン）→ `beginRun()`（出題列生成・タイマー開始。キー習得モードは
   ここで単語プールを再構築）→ `tick()`（100ms 毎。残り時間 or 無制限モードは経過時間を表示）→
