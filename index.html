@@ -29,6 +29,7 @@
             <button type="button" data-mode="jp">日本語ローマ字</button>
             <button type="button" data-mode="sym">記号・レイヤー</button>
             <button type="button" data-mode="mix">ミックス</button>
+            <button type="button" data-mode="guided">キー習得</button>
           </div>
         </div>
         <div class="ctrl-group">
@@ -80,6 +81,17 @@
         <div class="stat"><span class="lbl">正確率</span><b id="stAcc">100%</b></div>
         <div class="stat"><span class="lbl">コンボ</span><b id="stCombo">0</b></div>
         <div class="stat"><span class="lbl">ミス</span><b id="stMiss">0</b></div>
+      </div>
+      <div id="guided" hidden>
+        <div class="guided-head">
+          <span class="title">🔓 タイピング履歴に応じてキーが解放され、出題単語が変わります</span>
+          <span id="guidedStatus"></span>
+        </div>
+        <div id="keyset"></div>
+        <div class="guided-detail">
+          <div id="keyInfo"></div>
+          <canvas id="keyChart"></canvas>
+        </div>
       </div>
       <div id="wordMeta"></div>
       <div id="typeline" class="mono"></div>
@@ -134,6 +146,7 @@
         <div class="unit">pt</div>
       </div>
       <div class="score-formula">スコア = 正解打鍵×10 ＋ ワード×100 ＋ 最大コンボ×30 − ミス×20</div>
+      <div id="rUnlock" hidden></div>
       <div class="result-grid">
         <div><b id="rWpm">0</b><span>WPM</span></div>
         <div><b id="rAcc">0%</b><span>正確率</span></div>

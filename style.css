@@ -278,6 +278,102 @@ button:disabled {
   }
 }
 
+/* ---- guided mode (keybr方式のキー解放) ---- */
+#guided {
+  margin-bottom: 14px;
+}
+.guided-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.guided-head .title {
+  font-size: 12px;
+  color: var(--dim);
+}
+#guidedStatus {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent2);
+}
+#keyset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.gkey {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "SF Mono", "Cascadia Code", Consolas, Menlo, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  position: relative;
+  background: var(--key-bg2);
+  color: var(--text);
+  border: 2px solid var(--key-border);
+  box-shadow: none;
+}
+.gkey:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--accent);
+}
+.gkey.colored {
+  color: #fff;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+.gkey.locked {
+  opacity: 0.4;
+}
+.gkey.locked::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(to top right, transparent 46%, var(--dim) 48%, var(--dim) 52%, transparent 54%);
+}
+.gkey.focused {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 3px rgba(124, 108, 246, 0.35);
+}
+.gkey.selected {
+  border-color: var(--accent);
+}
+.guided-detail {
+  background: var(--panel2);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+#keyInfo {
+  font-size: 12px;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+#keyInfo b {
+  color: var(--text);
+}
+#keyInfo .gkey-name {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 15px;
+  color: var(--accent2);
+}
+#keyChart {
+  display: block;
+  width: 100%;
+  height: 180px;
+}
+
 /* ---- typing area ---- */
 #wordMeta {
   min-height: 44px;
@@ -699,6 +795,13 @@ dialog::backdrop {
   text-align: center;
   font-size: 11px;
   color: var(--dim);
+  margin-bottom: 14px;
+}
+#rUnlock {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--good);
   margin-bottom: 14px;
 }
 .result-grid {

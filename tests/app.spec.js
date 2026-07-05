@@ -1,5 +1,31 @@
 const { test, expect } = require("@playwright/test");
 
+// テスト用の最小QWERTYキーマップ（保存済みキーマップとして復元させる）
+function fakeKeymap() {
+  const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+  const physKeys = [];
+  const grid = [];
+  for (let r = 0; r < 3; r++) {
+    const row = [];
+    for (let c = 0; c < 10; c++) {
+      physKeys.push({ row: r, col: c, x: c, y: r, w: 1, h: 1, r: 0, rx: 0, ry: 0 });
+      const ch = rows[r][c];
+      row.push(ch ? { t: "kc", code: 4 + "abcdefghijklmnopqrstuvwxyz".indexOf(ch), mods: 0 } : { t: "none" });
+    }
+    grid.push(row);
+  }
+  return {
+    v: 1,
+    source: "vil",
+    label: "Test QWERTY",
+    matrixRows: 3,
+    matrixCols: 10,
+    physKeys,
+    kbName: "Test",
+    layers: [grid],
+  };
+}
+
 test("練習データを読み込みスタート画面を表示する", async ({ page }) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(String(error)));
@@ -32,4 +58,67 @@ test("キーボード未読込で開始すると案内を表示する", async ({
   await page.goto("/");
   await page.locator("#typeline").click();
   await expect(page.locator("#typeline")).toContainText("先にキーボードを読み込んでください");
+});
+
+test("キー習得モードでキー一覧とグラフを表示する", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "キー習得" }).click();
+  await expect(page.locator("#guided")).toBeVisible();
+  await expect(page.locator("#keyset .gkey")).toHaveCount(26);
+  await expect(page.locator("#keyset .gkey.locked")).toHaveCount(20);
+  await expect(page.locator("#keyset .gkey.focused")).toHaveCount(1);
+  await expect(page.locator("#keyInfo")).toContainText("未計測");
+  await expect(page.locator("#keyChart")).toBeVisible();
+});
+
+test("既存キーがすべて目標速度に達すると次のキーが解放される", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "キー習得" }).click();
+  const baseKeys = await page.locator("#keyset .gkey:not(.locked)").allTextContents();
+  expect(baseKeys).toHaveLength(6);
+  await page.evaluate((letters) => {
+    const histogram = {};
+    for (const ch of letters) histogram[ch] = [10, 0, 200];
+    localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
+  }, baseKeys);
+  await page.reload();
+  await page.getByRole("button", { name: "キー習得" }).click();
+  await expect(page.locator("#keyset .gkey:not(.locked)")).toHaveCount(7);
+  await expect(page.locator("#keyset .gkey.focused")).toHaveCount(1);
+});
+
+test("キー習得モードの走行で打鍵が記録されキーに色が付く", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate((keymap) => {
+    localStorage.setItem("vialTypingKeymap", JSON.stringify(keymap));
+    localStorage.setItem("cornixTime", "0"); // 無制限モードならEscで走行を終了できる
+  }, fakeKeymap());
+  await page.reload();
+  await expect(page.locator("#status")).toHaveClass(/ok/);
+  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.locator("#typeline").click();
+  await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 }); // 3-2-1カウントダウン待ち
+  for (let i = 0; i < 20; i++) {
+    const ch = (await page.locator("#typeline .cur").textContent()).trim();
+    await page.keyboard.press(ch);
+    await page.waitForTimeout(60);
+  }
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#resultDlg")).toBeVisible();
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("vialTypingGuided")));
+  expect(stored.results).toHaveLength(1);
+  await expect(page.locator("#keyset .gkey.colored")).not.toHaveCount(0);
+});
+
+test("全キーが目標速度に達すると解放完了の表示になる", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const histogram = {};
+    for (const ch of "abcdefghijklmnopqrstuvwxyz") histogram[ch] = [10, 0, 200];
+    localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "キー習得" }).click();
+  await expect(page.locator("#keyset .gkey.locked")).toHaveCount(0);
+  await expect(page.locator("#guidedStatus")).toContainText("すべてのキーを解放しました");
 });

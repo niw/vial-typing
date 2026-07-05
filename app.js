@@ -7,7 +7,7 @@
      3. Keymap state & reverse lookup (char -> key/shift/layer)
      4. Keyboard rendering
      5. WebHID (Vial/VIA protocol) reader + .vil import
-     6. Practice engine (EN / JP romaji / symbols)
+     6. Practice engine (EN / JP romaji / symbols / guided key unlocking)
    ================================================================ */
 
 /* ---------- 1. Physical layout ---------- */
@@ -1454,7 +1454,387 @@ try {
   throw error;
 }
 
-/* ---------- 6c. Engine ---------- */
+/* ---------- 6c. キー習得モード (keybr.com方式のキー解放) ---------- */
+
+// keybr.comのguided lessonの移植: 1走行を1レッスンとしてキー別の平均打鍵時間を記録し、
+// 指数平滑した速度が目標に達すると出現頻度順に次のキーを解放して出題単語を更新する
+const GUIDED_TARGET_TIME = 60000 / 175; // 目標速度175CPM(=35WPM)での1打鍵あたりの時間(ms)
+const GUIDED_MIN_KEYS = 6;
+const GUIDED_ALPHA = 0.1; // 指数平滑の係数
+const GUIDED_MAX_RESULTS = 300;
+const GUIDED_STORE_KEY = "vialTypingGuided";
+const GUIDED_SLOW_COLOR = [0xcc, 0x00, 0x00];
+const GUIDED_FAST_COLOR = [0x60, 0xd7, 0x88];
+
+// 練習コーパス中の出現頻度順のa-z (keybrのLetter.frequencyOrder相当)
+const GUIDED_LETTERS = (() => {
+  const freq = new Map([..."abcdefghijklmnopqrstuvwxyz"].map((ch) => [ch, 0]));
+  for (const word of EN_WORDS) for (const ch of word) if (freq.has(ch)) freq.set(ch, freq.get(ch) + 1);
+  return [...freq.keys()].sort((a, b) => freq.get(b) - freq.get(a) || a.charCodeAt(0) - b.charCodeAt(0));
+})();
+
+const guided = {
+  results: [], // 1走行分の記録 {t, h: {文字: [打鍵数, ミス数, 平均打鍵時間ms]}}
+  stats: new Map(),
+  keys: [],
+  words: [],
+  selected: null,
+};
+
+function guidedLoad() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(GUIDED_STORE_KEY));
+    if (raw && raw.v === 1 && Array.isArray(raw.results)) guided.results = raw.results;
+  } catch {}
+}
+
+function guidedSave() {
+  try {
+    localStorage.setItem(GUIDED_STORE_KEY, JSON.stringify({ v: 1, results: guided.results }));
+  } catch {}
+}
+
+// 信頼度 = 目標打鍵時間 / 実際の打鍵時間。1.0以上で「習得済み」(keybrのTarget.confidence相当)
+const guidedConfidence = (timeToType) => (timeToType == null ? null : GUIDED_TARGET_TIME / timeToType);
+
+// 全記録からキー別の平滑打鍵時間と自己ベストを再計算する (keybrのMutableKeyStats相当)
+function guidedRebuildStats() {
+  const stats = new Map(GUIDED_LETTERS.map((ch) => [ch, { samples: [], timeToType: null, bestTimeToType: null }]));
+  guided.results.forEach((result, index) => {
+    for (const [ch, sample] of Object.entries(result.h)) {
+      const stat = stats.get(ch);
+      const timeToType = sample[2];
+      if (!stat || !(timeToType > 0)) continue;
+      const filtered =
+        stat.timeToType == null ? timeToType : GUIDED_ALPHA * timeToType + (1 - GUIDED_ALPHA) * stat.timeToType;
+      stat.samples.push({ index, timeToType, filtered });
+      stat.timeToType = filtered;
+      stat.bestTimeToType = Math.min(stat.bestTimeToType ?? Infinity, filtered);
+    }
+  });
+  guided.stats = stats;
+}
+
+// 解放済みキーと注目キーを決める (keybrのGuidedLesson.update相当)
+function guidedUpdateKeys() {
+  const keys = GUIDED_LETTERS.map((ch) => {
+    const stat = guided.stats.get(ch);
+    return {
+      ch,
+      samples: stat.samples,
+      timeToType: stat.timeToType,
+      bestTimeToType: stat.bestTimeToType,
+      confidence: guidedConfidence(stat.timeToType),
+      bestConfidence: guidedConfidence(stat.bestTimeToType),
+      included: false,
+      focused: false,
+    };
+  });
+  for (const key of keys) {
+    const included = keys.filter((k) => k.included);
+    if (included.length < GUIDED_MIN_KEYS) {
+      key.included = true; // 最低限のキー数を確保
+    } else if ((key.bestConfidence ?? 0) >= 1) {
+      key.included = true; // 一度でも目標速度に達したキーは常に含める
+    } else if (included.every((k) => (k.bestConfidence ?? 0) >= 1)) {
+      key.included = true; // 既存キーがすべて目標に達したときだけ次のキーを解放
+    }
+  }
+  // 最も信頼度の低い解放済みキーを注目キーにする
+  const weakest = keys
+    .filter((k) => k.included && (k.bestConfidence ?? 0) < 1)
+    .sort((a, b) => (a.bestConfidence ?? 0) - (b.bestConfidence ?? 0));
+  if (weakest.length) weakest[0].focused = true;
+  guided.keys = keys;
+}
+
+// 解放済みキーだけで綴れて注目キーを含む単語を出題する (keybrのDictionary.find相当)
+function guidedWordPool() {
+  const included = new Set(guided.keys.filter((k) => k.included).map((k) => k.ch));
+  const focused = guided.keys.find((k) => k.focused)?.ch ?? null;
+  let words = EN_WORDS.filter((w) => w.length > 2 && [...w].every((ch) => included.has(ch)));
+  if (focused) words = words.filter((w) => w.includes(focused));
+  words = words.slice(0, 1000);
+  while (words.length < 15) words.push(guidedPseudoWord([...included], focused)); // 実単語が少ない序盤は疑似単語で補う
+  return words;
+}
+
+function guidedPseudoWord(letters, focused) {
+  let word = "";
+  const len = 3 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < len; i++) word += letters[Math.floor(Math.random() * letters.length)];
+  if (focused && !word.includes(focused)) {
+    const at = Math.floor(Math.random() * word.length);
+    word = word.slice(0, at) + focused + word.slice(at + 1);
+  }
+  return word;
+}
+
+// 1走行分の打鍵記録をキー別ヒストグラムに集計して保存し、新たに解放されたキーを返す
+function guidedRecordRun(steps) {
+  const byChar = new Map();
+  for (const step of steps) {
+    if (!guided.stats.has(step.ch)) continue;
+    let s = byChar.get(step.ch);
+    if (!s) byChar.set(step.ch, (s = { hit: 0, miss: 0, time: 0, count: 0 }));
+    s.hit += 1;
+    if (step.typo) s.miss += 1;
+    else if (step.time > 0) {
+      s.time += step.time;
+      s.count += 1;
+    }
+  }
+  const histogram = {};
+  for (const [ch, s] of byChar) {
+    const timeToType = s.count > 0 ? Math.round(s.time / s.count) : 0;
+    if (timeToType > 0 && (timeToType < 40 || timeToType > 12000)) continue; // 速すぎ/遅すぎは無効 (keybrのvalidateSample)
+    histogram[ch] = [s.hit, s.miss, timeToType];
+  }
+  if (Object.keys(histogram).length < 3) return []; // 文字種が少なすぎる走行は記録しない
+  const before = new Set(guided.keys.filter((k) => k.included).map((k) => k.ch));
+  guided.results.push({ t: Date.now(), h: histogram });
+  if (guided.results.length > GUIDED_MAX_RESULTS) guided.results.splice(0, guided.results.length - GUIDED_MAX_RESULTS);
+  guidedSave();
+  guidedRebuildStats();
+  guidedUpdateKeys();
+  guidedRenderAll();
+  return guided.keys.filter((k) => k.included && !before.has(k.ch)).map((k) => k.ch);
+}
+
+/* ---- キー習得モードの表示 ---- */
+
+const guidedWpm = (timeToType) => Math.round(12000 / timeToType);
+
+function guidedKeyColor(confidence) {
+  const t = Math.max(0, Math.min(1, confidence));
+  const mix = GUIDED_SLOW_COLOR.map((c, i) => Math.round(c + (GUIDED_FAST_COLOR[i] - c) * t));
+  return "rgb(" + mix.join(",") + ")";
+}
+
+function guidedSelectedKey() {
+  return guided.keys.find((k) => k.ch === guided.selected) ?? guided.keys.find((k) => k.focused) ?? guided.keys[0];
+}
+
+function renderKeySet() {
+  const wrap = $("keyset");
+  const current = guidedSelectedKey();
+  wrap.innerHTML = "";
+  for (const key of guided.keys) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "gkey";
+    el.textContent = key.ch;
+    if (!key.included) el.classList.add("locked");
+    if (key.focused) el.classList.add("focused");
+    if (key === current) el.classList.add("selected");
+    if (key.included && key.confidence != null) {
+      el.style.background = guidedKeyColor(key.confidence);
+      el.classList.add("colored");
+    }
+    el.title = key.included
+      ? key.ch.toUpperCase() +
+        (key.confidence == null ? "（未計測）" : "（信頼度 " + Math.round(key.confidence * 100) + "%）")
+      : key.ch.toUpperCase() + "（未解放）";
+    el.addEventListener("click", () => {
+      guided.selected = key.ch;
+      guidedRenderAll();
+    });
+    wrap.appendChild(el);
+  }
+}
+
+// 直近サンプルの回帰直線の傾き = 学習率(WPM/走行) (keybrのLearningRateの簡易版)
+function guidedLearningRate(key) {
+  const samples = key.samples.slice(-30);
+  if (samples.length < 5) return null;
+  const ys = samples.map((s) => 12000 / s.filtered);
+  const n = ys.length;
+  let sx = 0;
+  let sy = 0;
+  let sxx = 0;
+  let sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sx += i;
+    sy += ys[i];
+    sxx += i * i;
+    sxy += i * ys[i];
+  }
+  const d = n * sxx - sx * sx;
+  return d ? (n * sxy - sx * sy) / d : null;
+}
+
+function renderKeyInfo(key) {
+  const pct = (c) => Math.round(c * 100) + "%";
+  let html = '<b class="gkey-name">' + key.ch.toUpperCase() + "</b>";
+  if (!key.included) {
+    html += " 🔒 未解放：前のキーがすべて目標速度（35 WPM）に達すると解放されます";
+  } else if (key.timeToType == null) {
+    html += " 未計測：もう少し打鍵データが必要です";
+  } else {
+    html +=
+      " 直前 <b>" +
+      guidedWpm(key.timeToType) +
+      " WPM</b>（信頼度 " +
+      pct(key.confidence) +
+      "）・自己ベスト <b>" +
+      guidedWpm(key.bestTimeToType) +
+      " WPM</b>（" +
+      pct(key.bestConfidence) +
+      "）";
+    const rate = guidedLearningRate(key);
+    if (rate != null) html += "・学習率 " + (rate >= 0 ? "+" : "") + rate.toFixed(1) + " WPM/走行";
+  }
+  $("keyInfo").innerHTML = html;
+}
+
+// キー別の速度推移グラフ (keybrのKeyDetailsChart相当):
+// 走行ごとの速度の散布図 + 平滑速度の曲線 + 目標速度の水平線 + 現在位置の縦線
+function drawKeyChart(key) {
+  const canvas = $("keyChart");
+  const cssWidth = canvas.clientWidth;
+  const cssHeight = canvas.clientHeight;
+  if (!cssWidth) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(cssWidth * dpr);
+  canvas.height = Math.round(cssHeight * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const css = getComputedStyle(document.body);
+  const colors = {
+    grid: css.getPropertyValue("--border").trim() || "#eee",
+    axis: css.getPropertyValue("--dim").trim() || "#999",
+    dot: css.getPropertyValue("--accent2").trim() || "#7c6cf6",
+    curve: css.getPropertyValue("--accent").trim() || "#ff5d8f",
+    target: css.getPropertyValue("--good").trim() || "#18b566",
+    text: css.getPropertyValue("--dim").trim() || "#999",
+  };
+  const pad = { left: 40, right: 52, top: 16, bottom: 22 };
+  const box = { x: pad.left, y: pad.top, w: cssWidth - pad.left - pad.right, h: cssHeight - pad.top - pad.bottom };
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+  const samples = key.samples.slice(-30);
+  const targetWpm = guidedWpm(GUIDED_TARGET_TIME);
+
+  // 目盛りの範囲を決める
+  let xMax = samples.length;
+  let nowX = 0;
+  if (samples.length && (key.bestConfidence ?? 0) < 1) {
+    nowX = samples.length;
+    xMax = samples.length + 10; // 未習得キーは先の見通し分だけ右に伸ばす
+  }
+  const speeds = samples.flatMap((s) => [12000 / s.timeToType, 12000 / s.filtered]);
+  let yMin = Math.min(targetWpm, ...speeds);
+  let yMax = Math.max(targetWpm, ...speeds);
+  yMin = Math.max(0, Math.floor(yMin / 5) * 5 - 5);
+  yMax = Math.ceil(yMax / 5) * 5 + 5;
+
+  const px = (i) => box.x + (xMax > 1 ? ((i - 1) / (xMax - 1)) * box.w : box.w / 2);
+  const py = (wpm) => box.y + box.h - ((wpm - yMin) / (yMax - yMin)) * box.h;
+
+  // グリッドと軸
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = colors.grid;
+  ctx.beginPath();
+  for (let i = 0; i <= 5; i++) {
+    const gy = box.y + (box.h / 5) * i;
+    ctx.moveTo(box.x, gy);
+    ctx.lineTo(box.x + box.w, gy);
+    const gx = box.x + (box.w / 5) * i;
+    ctx.moveTo(gx, box.y);
+    ctx.lineTo(gx, box.y + box.h);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = colors.axis;
+  ctx.beginPath();
+  ctx.moveTo(box.x, box.y);
+  ctx.lineTo(box.x, box.y + box.h);
+  ctx.lineTo(box.x + box.w, box.y + box.h);
+  ctx.stroke();
+
+  ctx.font = "10px sans-serif";
+  ctx.fillStyle = colors.text;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i <= 5; i++) {
+    const wpm = yMin + ((yMax - yMin) / 5) * i;
+    ctx.fillText(Math.round(wpm), box.x - 6, py(wpm));
+  }
+
+  if (!samples.length) {
+    ctx.textAlign = "center";
+    ctx.font = "12px sans-serif";
+    ctx.fillText("まだ記録がありません — この文字を打つと記録されます", box.x + box.w / 2, box.y + box.h / 2);
+    return;
+  }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  for (let i = 0; i <= 5; i++) {
+    const v = 1 + ((xMax - 1) / 5) * i;
+    ctx.fillText(Math.round(v), px(v), box.y + box.h + 6);
+  }
+
+  // 目標速度の水平線
+  const ty = py(targetWpm);
+  ctx.strokeStyle = colors.target;
+  ctx.beginPath();
+  ctx.moveTo(box.x - 6, ty);
+  ctx.lineTo(box.x + box.w + 6, ty);
+  ctx.stroke();
+  ctx.fillStyle = colors.target;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("目標 " + targetWpm, box.x + box.w + 10, ty);
+
+  // 現在位置の縦線
+  if (nowX > 0) {
+    const nx = px(nowX);
+    ctx.strokeStyle = colors.axis;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(nx, box.y - 6);
+    ctx.lineTo(nx, box.y + box.h + 6);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillStyle = colors.text;
+    ctx.fillText("今", nx + 3, box.y - 2);
+  }
+
+  // 走行ごとの実測速度の散布図
+  ctx.fillStyle = colors.dot;
+  samples.forEach((s, i) => {
+    ctx.beginPath();
+    ctx.arc(px(i + 1), py(12000 / s.timeToType), 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // 平滑速度の曲線
+  ctx.strokeStyle = colors.curve;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  samples.forEach((s, i) => {
+    const x = px(i + 1);
+    const y = py(12000 / s.filtered);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function guidedRenderAll() {
+  const focused = guided.keys.find((k) => k.focused);
+  $("guidedStatus").textContent = focused
+    ? "習得中のキー: " + focused.ch.toUpperCase()
+    : "🎉 すべてのキーを解放しました";
+  renderKeySet();
+  const key = guidedSelectedKey();
+  renderKeyInfo(key);
+  drawKeyChart(key);
+}
+
+/* ---------- 6d. Engine ---------- */
 
 const COMBO_STEP = 30; // every 30 consecutive hits ...
 const COMBO_BONUS = 1; // ... +1 second
@@ -1560,6 +1940,10 @@ const engine = {
   warn: "",
   counting: false,
   countId: null,
+  // キー習得モードの打鍵記録
+  steps: [],
+  lastInputAt: 0,
+  typoPending: false,
 
   makeItem(mode) {
     mode = mode || this.mode;
@@ -1567,6 +1951,7 @@ const engine = {
       const r = Math.random();
       mode = r < 0.35 ? "en" : r < 0.7 ? "jp" : "sym";
     }
+    if (mode === "guided") return { text: drawFrom(guided.words, "guided"), meta: "" };
     if (mode === "en")
       return Math.random() < 0.2
         ? { text: drawFrom(EN_SENTS, "ens"), meta: "" }
@@ -1632,6 +2017,15 @@ const engine = {
 
   beginRun() {
     clearInterval(this.timerId);
+    if (this.mode === "guided") {
+      // 最新の習得状況で出題単語を作り直す
+      guidedUpdateKeys();
+      guided.words = guidedWordPool();
+      bags.guided = null;
+      this.steps = [];
+      this.lastInputAt = 0;
+      this.typoPending = false;
+    }
     this.items = [];
     this.fillItems(20);
     this.idx = 0;
@@ -1723,6 +2117,8 @@ const engine = {
       this.text = it.text;
       this.pos = 0;
     }
+    this.lastInputAt = 0; // 単語間の間隔は打鍵時間に含めない
+    this.typoPending = false;
     this.warn = "";
     this.render();
     this.refreshHint();
@@ -1755,12 +2151,24 @@ const engine = {
   inputText(c) {
     const t = this.text[this.pos];
     if (c === t) {
+      if (this.mode === "guided") this.recordStep(t);
       this.pos++;
       this.onCorrect();
       if (this.pos >= this.text.length) return this.nextItem();
-    } else this.onMiss();
+    } else {
+      if (this.mode === "guided") this.typoPending = true;
+      this.onMiss();
+    }
     this.render();
     this.refreshHint();
+  },
+
+  // 文字の確定1回を1打鍵として記録する。ミスした文字は打鍵時間の集計から除外される
+  recordStep(ch) {
+    const now = Date.now();
+    this.steps.push({ ch, typo: this.typoPending, time: this.lastInputAt ? now - this.lastInputAt : 0 });
+    this.lastInputAt = now;
+    this.typoPending = false;
   },
 
   inputJP(c) {
@@ -1809,6 +2217,16 @@ const engine = {
     clearInterval(this.timerId);
     this.running = false;
     this.updateStats();
+    const unlock = $("rUnlock");
+    unlock.hidden = true;
+    if (this.mode === "guided" && this.steps.length) {
+      const unlocked = guidedRecordRun(this.steps);
+      this.steps = [];
+      if (unlocked.length) {
+        unlock.hidden = false;
+        unlock.textContent = "🔓 新しいキーを解放: " + unlocked.map((ch) => ch.toUpperCase()).join(" ");
+      }
+    }
     $("rTitle").textContent = isUnlimited() ? "🎉 おつかれさま！" : "🎉 タイムアップ！";
     const score = Math.max(0, Math.round(this.correct * 10 + this.words * 100 + this.maxCombo * 30 - this.miss * 20));
     const rank = score >= 12000 ? "S" : score >= 9000 ? "A" : score >= 6000 ? "B" : score >= 3000 ? "C" : "D";
@@ -1964,7 +2382,7 @@ function escapeHtml(s) {
   );
 }
 
-/* ---------- 6d. Input & UI wiring ---------- */
+/* ---------- 6e. Input & UI wiring ---------- */
 
 document.addEventListener("keydown", (e) => {
   if ($("resultDlg").open) return; // Esc closes the dialog natively
@@ -2010,6 +2428,8 @@ document.querySelectorAll(".modes button").forEach((b) => {
     });
     b.classList.add("active");
     engine.mode = b.dataset.mode;
+    $("guided").hidden = engine.mode !== "guided";
+    if (engine.mode === "guided") guidedRenderAll();
     engine.idle();
   });
 });
@@ -2092,6 +2512,9 @@ $("btnSound").addEventListener("click", () => {
 /* ---------- startup ---------- */
 if (!restoreSavedKeymap()) showKbPlaceholder(); // 前回のレイアウト+キーマップがあれば自動復元
 updateSoundBtn();
+guidedLoad();
+guidedRebuildStats();
+guidedUpdateKeys();
 engine.idle();
 
 // ウィンドウ幅に合わせてキーボードを再フィット（キーマップ読込時のみ）
@@ -2103,5 +2526,6 @@ window.addEventListener("resize", () => {
       renderKeyboard();
       if (engine?.hint) paintHint(engine.hint);
     }
+    if (!$("guided").hidden) drawKeyChart(guidedSelectedKey());
   }, 120);
 });
