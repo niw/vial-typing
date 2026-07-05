@@ -314,11 +314,33 @@ button:disabled {
   font-size: 11px;
   padding: 4px 10px;
 }
+.course-tabs {
+  display: flex;
+  gap: 4px;
+}
+.course-tabs button {
+  padding: 3px 10px;
+  font-size: 10.5px;
+  box-shadow: 0 2px 0 var(--border);
+}
+.course-tabs button.active {
+  background: linear-gradient(90deg, var(--accent2), #9d8ffa);
+  border-color: var(--accent2);
+  color: #fff;
+  box-shadow: 0 2px 0 #5e4fd4;
+}
 #keyset {
+  margin-bottom: 10px;
+}
+#keyset .keyrow {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 10px;
+}
+#keyset .keyrow + .keyrow {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
 }
 .gkey {
   width: 34px;

@@ -1466,17 +1466,47 @@ const GUIDED_STORE_KEY = "vialTypingGuided";
 const GUIDED_SLOW_COLOR = [0xcc, 0x00, 0x00];
 const GUIDED_FAST_COLOR = [0x60, 0xd7, 0x88];
 
-// 練習コーパス中の出現頻度順のa-z (keybrのLetter.frequencyOrder相当)
-const GUIDED_LETTERS = (() => {
-  const freq = new Map([..."abcdefghijklmnopqrstuvwxyz"].map((ch) => [ch, 0]));
-  for (const word of EN_WORDS) for (const ch of word) if (freq.has(ch)) freq.set(ch, freq.get(ch) + 1);
+// コーパス中の出現頻度順に文字を並べる (keybrのLetter.frequencyOrder相当。出現しない文字は含めない)
+function guidedFrequencyOrder(texts, accept) {
+  const freq = new Map();
+  for (const text of texts) {
+    for (const raw of text) {
+      const ch = raw.toLowerCase();
+      if (!accept(ch)) continue;
+      freq.set(ch, (freq.get(ch) || 0) + 1);
+    }
+  }
   return [...freq.keys()].sort((a, b) => freq.get(b) - freq.get(a) || a.charCodeAt(0) - b.charCodeAt(0));
-})();
+}
+
+const guidedIsLetter = (ch) => ch >= "a" && ch <= "z";
+const guidedIsSymbol = (ch) => ch !== " " && !guidedIsLetter(ch); // 記号と数字（大文字は小文字化済み）
+
+// 練習モード別のコース: 対象キーとそのコーパスでの解放順。打鍵統計はコース間で共有する
+const GUIDED_COURSES = {
+  en: { letters: guidedFrequencyOrder(EN_WORDS.concat(EN_SENTS), guidedIsLetter) },
+  jp: {
+    letters: guidedFrequencyOrder(
+      JP_WORDS.map(([kana]) => guidedRomajiOf(kana)),
+      guidedIsLetter,
+    ),
+  },
+  sym: {
+    letters: guidedFrequencyOrder(SYM_ITEMS, guidedIsLetter),
+    symbols: guidedFrequencyOrder(SYM_ITEMS, guidedIsSymbol),
+  },
+};
+
+// 統計を追跡する全キー（全コースの英字と記号の和集合）
+const GUIDED_TRACKED = [
+  ...new Set(Object.values(GUIDED_COURSES).flatMap((course) => [...course.letters, ...(course.symbols || [])])),
+];
 
 const guided = {
   results: [], // 1走行分の記録 {t, h: {文字: [打鍵数, ミス数, 平均打鍵時間ms]}}
   stats: new Map(),
-  keys: [],
+  courses: {}, // コースごとの解放状態 {en: {letters}, jp: {letters}, sym: {letters, symbols}}
+  course: "en", // パネルに表示中のコース
   words: { en: [], jp: [], sym: [] }, // 練習モード別の出題プール
   selected: null,
 };
@@ -1499,7 +1529,7 @@ const guidedConfidence = (timeToType) => (timeToType == null ? null : GUIDED_TAR
 
 // 全記録からキー別の平滑打鍵時間と自己ベストを再計算する (keybrのMutableKeyStats相当)
 function guidedRebuildStats() {
-  const stats = new Map(GUIDED_LETTERS.map((ch) => [ch, { samples: [], timeToType: null, bestTimeToType: null }]));
+  const stats = new Map(GUIDED_TRACKED.map((ch) => [ch, { samples: [], timeToType: null, bestTimeToType: null }]));
   guided.results.forEach((result, index) => {
     for (const [ch, sample] of Object.entries(result.h)) {
       const stat = stats.get(ch);
@@ -1515,9 +1545,9 @@ function guidedRebuildStats() {
   guided.stats = stats;
 }
 
-// 解放済みキーと注目キーを決める (keybrのGuidedLesson.update相当)
-function guidedUpdateKeys() {
-  const keys = GUIDED_LETTERS.map((ch) => {
+// 1トラック分の解放済みキーと注目キーを決める (keybrのGuidedLesson.update相当)
+function guidedTrackKeys(order) {
+  const keys = order.map((ch) => {
     const stat = guided.stats.get(ch);
     return {
       ch,
@@ -1545,17 +1575,45 @@ function guidedUpdateKeys() {
     .filter((k) => k.included && (k.bestConfidence ?? 0) < 1)
     .sort((a, b) => (a.bestConfidence ?? 0) - (b.bestConfidence ?? 0));
   if (weakest.length) weakest[0].focused = true;
-  guided.keys = keys;
+  return keys;
+}
+
+// 共有統計から各コースの解放状態を計算する
+function guidedUpdateKeys() {
+  guided.courses = {
+    en: { letters: guidedTrackKeys(GUIDED_COURSES.en.letters) },
+    jp: { letters: guidedTrackKeys(GUIDED_COURSES.jp.letters) },
+    sym: {
+      letters: guidedTrackKeys(GUIDED_COURSES.sym.letters),
+      symbols: guidedTrackKeys(GUIDED_COURSES.sym.symbols),
+    },
+  };
+}
+
+const guidedIncludedSet = (track) => new Set(track.filter((k) => k.included).map((k) => k.ch));
+const guidedFocusOf = (track) => track.find((k) => k.focused)?.ch ?? null;
+
+// 全コース・全トラックの解放済みキーの和集合（解放アナウンスの差分検出用）
+function guidedIncludedAll() {
+  const set = new Set();
+  for (const course of Object.values(guided.courses))
+    for (const track of [course.letters, course.symbols])
+      if (track) for (const key of track) if (key.included) set.add(key.ch);
+  return set;
 }
 
 // 解放済みキーだけで打てるお題を練習モード別に作る (keybrのDictionary.find相当)
 function guidedBuildPools() {
-  const included = new Set(guided.keys.filter((k) => k.included).map((k) => k.ch));
-  const focused = guided.keys.find((k) => k.focused)?.ch ?? null;
+  const courses = guided.courses;
   return {
-    en: guidedEnPool(included, focused),
-    jp: guidedJpPool(included, focused),
-    sym: guidedSymPool(included, focused),
+    en: guidedEnPool(guidedIncludedSet(courses.en.letters), guidedFocusOf(courses.en.letters)),
+    jp: guidedJpPool(guidedIncludedSet(courses.jp.letters), guidedFocusOf(courses.jp.letters)),
+    sym: guidedSymPool(
+      guidedIncludedSet(courses.sym.letters),
+      guidedFocusOf(courses.sym.letters),
+      guidedIncludedSet(courses.sym.symbols),
+      guidedFocusOf(courses.sym.symbols),
+    ),
   };
 }
 
@@ -1601,37 +1659,33 @@ function guidedPseudoKana(included, focused) {
   return [word, word];
 }
 
-// 英字部分が解放済みキーだけの記号行（不足分は識別子+記号のテンプレートで生成）
-function guidedSymPool(included, focused) {
-  const lettersOk = (item) => [...item.toLowerCase()].filter((ch) => /[a-z]/.test(ch)).every((ch) => included.has(ch));
-  let pool = SYM_ITEMS.filter(lettersOk);
-  if (focused) {
-    const withFocus = pool.filter((item) => item.toLowerCase().includes(focused));
+// 英字も記号もそれぞれの解放済みキーに収まる記号行（不足分は識別子+記号で生成）
+function guidedSymPool(letters, letterFocus, symbols, symbolFocus) {
+  const typeable = (item) =>
+    [...item.toLowerCase()].every((ch) => ch === " " || (guidedIsLetter(ch) ? letters.has(ch) : symbols.has(ch)));
+  let pool = SYM_ITEMS.filter(typeable);
+  const focus = symbolFocus ?? letterFocus;
+  if (focus) {
+    const withFocus = pool.filter((item) => item.toLowerCase().includes(focus));
     if (withFocus.length) pool = withFocus;
   }
   pool = pool.slice();
-  while (pool.length < 8) pool.push(guidedSymLine(included, focused));
+  while (pool.length < 8) pool.push(guidedSymLine(letters, letterFocus, symbols, symbolFocus));
   return pool;
 }
 
-function guidedSymLine(included, focused) {
-  const letters = [...included];
-  const ident = (f) => guidedPseudoWord(letters, f).slice(0, 4);
-  const a = ident(focused);
-  const b = ident(null);
-  const c = ident(null);
-  const templates = [
-    a + " = (" + b + " + " + c + ");",
-    a + " && " + b + " || !" + c,
-    a + '[0] = "' + b + '";',
-    "(" + a + ") => " + a + " * 2",
-    a + " += " + b + " - " + c + ";",
-    a + "_" + b + "-" + c + "." + a,
-    "/^[" + a + "]+$/",
-    a + " ? " + b + " : " + c + ";",
-    "{ " + a + ': "' + b + '" }',
-  ];
-  return templates[Math.floor(Math.random() * templates.length)];
+// 解放済みの英字識別子を解放済みの記号でつないだ練習行
+function guidedSymLine(letters, letterFocus, symbols, symbolFocus) {
+  const symbolList = [...symbols];
+  const pickSymbol = () => symbolList[Math.floor(Math.random() * symbolList.length)];
+  const ident = (focus) => guidedPseudoWord([...letters], focus).slice(0, 4);
+  let line = ident(letterFocus);
+  const joints = 1 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < joints; i++) {
+    const symbol = i === 0 && symbolFocus ? symbolFocus : pickSymbol();
+    line += Math.random() < 0.5 ? " " + symbol + " " + ident(null) : symbol + ident(null);
+  }
+  return line;
 }
 
 function guidedPseudoWord(letters, focused) {
@@ -1649,9 +1703,10 @@ function guidedPseudoWord(letters, focused) {
 function guidedRecordRun(steps) {
   const byChar = new Map();
   for (const step of steps) {
-    if (!guided.stats.has(step.ch)) continue;
-    let s = byChar.get(step.ch);
-    if (!s) byChar.set(step.ch, (s = { hit: 0, miss: 0, time: 0, count: 0 }));
+    const ch = step.ch.toLowerCase(); // Shift打ちの大文字は同じ物理キーとして集計する
+    if (!guided.stats.has(ch)) continue;
+    let s = byChar.get(ch);
+    if (!s) byChar.set(ch, (s = { hit: 0, miss: 0, time: 0, count: 0 }));
     s.hit += 1;
     if (step.typo) s.miss += 1;
     else if (step.time > 0) {
@@ -1666,14 +1721,14 @@ function guidedRecordRun(steps) {
     histogram[ch] = [s.hit, s.miss, timeToType];
   }
   if (Object.keys(histogram).length < 3) return []; // 文字種が少なすぎる走行は記録しない
-  const before = new Set(guided.keys.filter((k) => k.included).map((k) => k.ch));
+  const before = guidedIncludedAll();
   guided.results.push({ t: Date.now(), h: histogram });
   if (guided.results.length > GUIDED_MAX_RESULTS) guided.results.splice(0, guided.results.length - GUIDED_MAX_RESULTS);
   guidedSave();
   guidedRebuildStats();
   guidedUpdateKeys();
   guidedRenderAll();
-  return guided.keys.filter((k) => k.included && !before.has(k.ch)).map((k) => k.ch);
+  return [...guidedIncludedAll()].filter((ch) => !before.has(ch));
 }
 
 /* ---- キー習得モードの表示 ---- */
@@ -1686,35 +1741,47 @@ function guidedKeyColor(confidence) {
   return "rgb(" + mix.join(",") + ")";
 }
 
+// 表示中コースのトラック一覧（記号コースは英字+記号の2トラック）
+function guidedCourseTracks() {
+  const course = guided.courses[guided.course];
+  return course.symbols ? [course.letters, course.symbols] : [course.letters];
+}
+
 function guidedSelectedKey() {
-  return guided.keys.find((k) => k.ch === guided.selected) ?? guided.keys.find((k) => k.focused) ?? guided.keys[0];
+  const all = guidedCourseTracks().flat();
+  return all.find((k) => k.ch === guided.selected) ?? all.find((k) => k.focused) ?? all[0];
 }
 
 function renderKeySet() {
   const wrap = $("keyset");
   const current = guidedSelectedKey();
   wrap.innerHTML = "";
-  for (const key of guided.keys) {
-    const el = document.createElement("button");
-    el.type = "button";
-    el.className = "gkey";
-    el.textContent = key.ch;
-    if (!key.included) el.classList.add("locked");
-    if (key.focused) el.classList.add("focused");
-    if (key === current) el.classList.add("selected");
-    if (key.included && key.confidence != null) {
-      el.style.background = guidedKeyColor(key.confidence);
-      el.classList.add("colored");
+  for (const track of guidedCourseTracks()) {
+    const row = document.createElement("div");
+    row.className = "keyrow";
+    for (const key of track) {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "gkey";
+      el.textContent = key.ch;
+      if (!key.included) el.classList.add("locked");
+      if (key.focused) el.classList.add("focused");
+      if (key === current) el.classList.add("selected");
+      if (key.included && key.confidence != null) {
+        el.style.background = guidedKeyColor(key.confidence);
+        el.classList.add("colored");
+      }
+      el.title = key.included
+        ? key.ch.toUpperCase() +
+          (key.confidence == null ? "（未計測）" : "（信頼度 " + Math.round(key.confidence * 100) + "%）")
+        : key.ch.toUpperCase() + "（未解放）";
+      el.addEventListener("click", () => {
+        guided.selected = key.ch;
+        guidedRenderAll();
+      });
+      row.appendChild(el);
     }
-    el.title = key.included
-      ? key.ch.toUpperCase() +
-        (key.confidence == null ? "（未計測）" : "（信頼度 " + Math.round(key.confidence * 100) + "%）")
-      : key.ch.toUpperCase() + "（未解放）";
-    el.addEventListener("click", () => {
-      guided.selected = key.ch;
-      guidedRenderAll();
-    });
-    wrap.appendChild(el);
+    wrap.appendChild(row);
   }
 }
 
@@ -1899,11 +1966,17 @@ function drawKeyChart(key) {
 }
 
 function guidedRenderAll() {
-  const focused = guided.keys.find((k) => k.focused);
-  $("guidedStatus").textContent = focused
-    ? "習得中のキー: " + focused.ch.toUpperCase()
-    : "🎉 すべてのキーを解放しました";
+  const course = guided.courses[guided.course];
+  const parts = [];
+  const letterFocus = guidedFocusOf(course.letters);
+  if (letterFocus) parts.push("習得中のキー: " + letterFocus.toUpperCase());
+  const symbolFocus = course.symbols ? guidedFocusOf(course.symbols) : null;
+  if (symbolFocus) parts.push("記号: " + symbolFocus);
+  $("guidedStatus").textContent = parts.length ? parts.join(" ・ ") : "🎉 すべてのキーを解放しました";
   $("btnGuidedReset").disabled = !guided.results.length;
+  document.querySelectorAll(".course-tabs button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.course === guided.course);
+  });
   renderKeySet();
   const key = guidedSelectedKey();
   renderKeyInfo(key);
@@ -2514,7 +2587,20 @@ document.querySelectorAll(".modes button").forEach((b) => {
     });
     b.classList.add("active");
     engine.mode = b.dataset.mode;
+    if (engine.mode !== "mix" && guided.course !== engine.mode) {
+      // 練習モードに対応するコース表示へ自動で切り替える
+      guided.course = engine.mode;
+      guided.selected = null;
+    }
+    if (engine.guided) guidedRenderAll();
     engine.idle();
+  });
+});
+document.querySelectorAll(".course-tabs button").forEach((b) => {
+  b.addEventListener("click", () => {
+    guided.course = b.dataset.course;
+    guided.selected = null;
+    guidedRenderAll();
   });
 });
 document.querySelectorAll(".playstyle button").forEach((b) => {

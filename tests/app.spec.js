@@ -146,6 +146,28 @@ test("キー習得モードの日本語走行でも打鍵が記録される", as
   expect(stored.results).toHaveLength(1);
 });
 
+test("コースごとに解放順が変わり記号コースには記号キーも並ぶ", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "キー習得" }).click();
+  const enOrder = await page.locator("#keyset .gkey").allTextContents();
+  await page.getByRole("button", { name: "日本語", exact: true }).click();
+  const jpOrder = await page.locator("#keyset .gkey").allTextContents();
+  expect(jpOrder.join("")).not.toBe(enOrder.join(""));
+  await page.getByRole("button", { name: "記号", exact: true }).click();
+  await expect(page.locator("#keyset .keyrow")).toHaveCount(2);
+  const symbolChips = await page.locator("#keyset .keyrow").nth(1).locator(".gkey").allTextContents();
+  expect(symbolChips.length).toBeGreaterThan(10);
+  expect(symbolChips).toContain("=");
+});
+
+test("練習モードに合わせてコース表示が切り替わる", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.getByRole("button", { name: "記号・レイヤー" }).click();
+  await expect(page.locator(".course-tabs button.active")).toHaveText("記号");
+  await expect(page.locator("#keyset .keyrow")).toHaveCount(2);
+});
+
 test("キー習得モードの記号走行でもお題が出る", async ({ page }) => {
   await page.goto("/");
   await page.evaluate((keymap) => {
