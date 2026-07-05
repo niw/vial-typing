@@ -55,13 +55,16 @@ flowchart TD
   - `findKeyForChar()`: 文字 → `{key, layer, shiftKey, layerKey, alt}`。全レイヤーの候補を
     スコアリング（ホールド数・レイヤー深さ・ユーザー設定 `keyPref`/`layerPref` で重み付け）して
     最良と別案を返す。結果は `charCache` にメモ化し、設定やキーマップが変わると破棄される。
+  - `fingerFor()`: 物理配置から指番号（1=親指〜5=小指、ピアノ運指式）を推定。盤面中央で左右に分け、
+    分割型は各半分の最終行を親指、残りは列単位で内側から人差し指×2列・中指・薬指・外側を小指とする。
 
 ## 4. Keyboard rendering — キーボード描画
 
 - `renderKeyboard()`: `PHYS_KEYS` から DOM を生成し、回転クラスタを含む座標系をウィンドウ幅にフィット。
 - `legendFor()` / `updateLegends()`: 表示レイヤーのキーごとの刻印（`shiftedSub` が Shift 側文字の小表示）。
 - `buildLayerTabs()` / `setViewLayer()`: レイヤー切替タブ。ヒント表示時は自動で該当レイヤーへ切替。
-- `paintHint()`: 案内対象キー（押すキー・Shift・レイヤーキー）のハイライト。
+- `paintHint()`: 案内対象キー（押すキー・Shift・レイヤーキー）のハイライトと指番号バッジの表示。
+  タイプライン下のヒントチップにも `refreshHint()` が同じ指番号を付ける。
 
 ## 5. WebHID + .vil import — キーマップの読み取り
 

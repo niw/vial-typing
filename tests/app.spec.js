@@ -60,6 +60,27 @@ test("キーボード未読込で開始すると案内を表示する", async ({
   await expect(page.locator("#typeline")).toContainText("先にキーボードを読み込んでください");
 });
 
+test("押すべきキーとヒントに指番号が表示される", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate((keymap) => {
+    localStorage.setItem("vialTypingKeymap", JSON.stringify(keymap));
+    localStorage.setItem("cornixTime", "0");
+  }, fakeKeymap());
+  await page.reload();
+  await expect(page.locator("#status")).toHaveClass(/ok/);
+  await page.locator("#typeline").click();
+  await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 });
+  // 標準的なタッチタイピングの指割り当て (2=人差し指...5=小指)
+  const fingers = {
+    ...{ q: 5, a: 5, z: 5, w: 4, s: 4, x: 4, e: 3, d: 3, c: 3 },
+    ...{ r: 2, f: 2, v: 2, t: 2, g: 2, b: 2, y: 2, h: 2, n: 2, u: 2, j: 2, m: 2 },
+    ...{ i: 3, k: 3, o: 4, l: 4, p: 5 },
+  };
+  const ch = (await page.locator("#typeline .cur").textContent()).trim();
+  await expect(page.locator("#hint .chip.t .fnum")).toHaveText(String(fingers[ch]));
+  await expect(page.locator("#kb .key.hl-target .fingertag")).toHaveText(String(fingers[ch]));
+});
+
 test("キー習得モードでも練習モードを選べる", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "キー習得" }).click();

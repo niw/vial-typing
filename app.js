@@ -698,6 +698,61 @@ function physHas(r, c) {
   return _physSet.has(r + "," + c);
 }
 
+// 物理配置から指番号を推定する (1=親指, 2=人差し指, 3=中指, 4=薬指, 5=小指)
+const FINGER_NAMES = { 1: "親指", 2: "人差し指", 3: "中指", 4: "薬指", 5: "小指" };
+let _fingerRef = null;
+let _fingerMap = null;
+function fingerFor(row, col) {
+  if (_fingerRef !== PHYS_KEYS) {
+    _fingerRef = PHYS_KEYS;
+    _fingerMap = buildFingerMap();
+  }
+  return _fingerMap.get(row + "," + col) ?? null;
+}
+
+// ヒューリスティック: 盤面中央で左右の手に分け、分割型(偶数行数>=6)は各半分の最終行を親指、
+// それ以外は回転キーと横長キー(スペース等)を親指とする。残りは列単位で内側から
+// 人差し指×2列・中指・薬指・以降は小指を割り当て、キー1個だけの列は最寄りの列に合流する
+function buildFingerMap() {
+  const map = new Map();
+  if (!PHYS_KEYS.length) return map;
+  const entries = PHYS_KEYS.map((k) => ({ k, cx: k.x + k.w / 2 }));
+  const midX = (Math.min(...entries.map((e) => e.cx)) + Math.max(...entries.map((e) => e.cx))) / 2;
+  const splitHalves = MATRIX_ROWS >= 6 && MATRIX_ROWS % 2 === 0;
+  const thumbRows = splitHalves ? [MATRIX_ROWS / 2 - 1, MATRIX_ROWS - 1] : [];
+  const isThumb = (e) => (splitHalves ? thumbRows.includes(e.k.row) : e.k.r !== 0 || e.k.w >= 1.75);
+  for (const hand of ["L", "R"]) {
+    const handKeys = entries.filter((e) => (hand === "L" ? e.cx <= midX : e.cx > midX));
+    const fingerKeys = [];
+    for (const e of handKeys) {
+      if (isThumb(e)) map.set(e.k.row + "," + e.k.col, 1);
+      else fingerKeys.push(e);
+    }
+    const cols = [];
+    for (const e of fingerKeys.sort((a, b) => a.cx - b.cx)) {
+      const col = cols[cols.length - 1];
+      if (col && Math.abs(col.x - e.cx) < 0.55) {
+        col.keys.push(e);
+        col.x += (e.cx - col.x) / col.keys.length;
+      } else cols.push({ x: e.cx, keys: [e] });
+    }
+    const full = cols.filter((c) => c.keys.length > 1);
+    if (full.length) {
+      for (const col of cols) {
+        if (col.keys.length > 1) continue;
+        const nearest = full.reduce((best, c) => (Math.abs(c.x - col.x) < Math.abs(best.x - col.x) ? c : best));
+        nearest.keys.push(...col.keys);
+      }
+    }
+    const ranked = (full.length ? full : cols).sort((a, b) => (hand === "L" ? b.x - a.x : a.x - b.x));
+    ranked.forEach((col, i) => {
+      const finger = i <= 1 ? 2 : i === 2 ? 3 : i === 3 ? 4 : 5;
+      for (const e of col.keys) map.set(e.k.row + "," + e.k.col, finger);
+    });
+  }
+  return map;
+}
+
 // find a key holding shift. Searches `layer` first, then falls back to the base
 // layer (pressing Shift on base, then holding the layer key, keeps Shift active).
 function findShiftKey(layer, hand) {
@@ -1006,6 +1061,7 @@ function clearHighlights() {
   for (const el of keyEls.values()) {
     el.classList.remove("hl-target", "hl-shift", "hl-layer", "hl-alt");
     delete el.dataset.order;
+    el.querySelector(".fingertag")?.remove();
   }
 }
 
@@ -1018,6 +1074,14 @@ function paintHint(hint) {
     if (!el) return;
     el.classList.add(cls);
     if (order) el.dataset.order = order;
+    const finger = fingerFor(pos.r, pos.c);
+    if (finger) {
+      const tag = document.createElement("i");
+      tag.className = "fingertag";
+      tag.textContent = finger;
+      tag.title = FINGER_NAMES[finger];
+      el.appendChild(tag);
+    }
   };
   let n = 1;
   if (shiftFirst) {
@@ -2479,19 +2543,29 @@ const engine = {
     }
     if (h.layer !== viewLayer) setViewLayer(h.layer);
     else paintHint(h);
+    // ピアノ運指風の指番号バッジ（チップの上に重ねる）
+    const fingerBadge = (pos) => {
+      const finger = pos && fingerFor(pos.r, pos.c);
+      return finger ? '<i class="fnum" title="' + FINGER_NAMES[finger] + '">' + finger + "</i>" : "";
+    };
     let html = "";
     if (h.shiftKey?.fromBase && h.layerKey) {
       // Shift lives on the pre-switch layer: press order matters
       html +=
-        '<span class="chip s">① Shift を先に押しながら</span>＋' +
-        '<span class="chip l">② L' +
+        '<span class="chip s">' +
+        fingerBadge(h.shiftKey) +
+        "① Shift を先に押しながら</span>＋" +
+        '<span class="chip l">' +
+        fingerBadge(h.layerKey) +
+        "② L" +
         h.layer +
         " キー</span>＋";
     } else {
-      if (h.layerKey) html += '<span class="chip l">L' + h.layer + " キーを押しながら</span>＋";
-      if (h.shiftKey) html += '<span class="chip s">Shift</span>＋';
+      if (h.layerKey)
+        html += '<span class="chip l">' + fingerBadge(h.layerKey) + "L" + h.layer + " キーを押しながら</span>＋";
+      if (h.shiftKey) html += '<span class="chip s">' + fingerBadge(h.shiftKey) + "Shift</span>＋";
     }
-    html += '<span class="chip t">' + escapeHtml(dispChar(ch)) + "</span>";
+    html += '<span class="chip t">' + fingerBadge(h.key) + escapeHtml(dispChar(ch)) + "</span>";
     if (h.alt) {
       const a = h.alt;
       let alt = "";
