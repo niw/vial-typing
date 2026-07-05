@@ -428,6 +428,7 @@
         <button data-time="30">30秒</button>
         <button data-time="60" class="active">60秒</button>
         <button data-time="90">90秒</button>
+        <button data-time="0">無制限</button>
       </div>
     </div>
     <div class="ctrl-group settings">
@@ -457,7 +458,7 @@
     </div>
   </div>
   <div class="statbar">
-    <div class="stat time" id="stTimeWrap"><span class="lbl">残り時間</span><b id="stTime">60.0</b></div>
+    <div class="stat time" id="stTimeWrap"><span class="lbl" id="stTimeLbl">残り時間</span><b id="stTime">60.0</b></div>
     <div class="stat"><span class="lbl">WPM</span><b id="stWpm">0</b></div>
     <div class="stat"><span class="lbl">正確率</span><b id="stAcc">100%</b></div>
     <div class="stat"><span class="lbl">コンボ</span><b id="stCombo">0</b></div>
@@ -495,7 +496,7 @@
 <div id="drop">.vil / vial.json をドロップして読み込み</div>
 
 <dialog id="resultDlg">
-  <h2 style="font-size:18px; text-align:center;">🎉 タイムアップ！</h2>
+  <h2 id="rTitle" style="font-size:18px; text-align:center;">🎉 タイムアップ！</h2>
   <div class="score-hero">
     <div class="rank" id="rRank">A</div>
     <div class="num" id="rScore">0</div>
@@ -1669,11 +1670,22 @@ const SYM_ITEMS = [
 
 const COMBO_STEP = 30;    // every 30 consecutive hits ...
 const COMBO_BONUS = 1;    // ... +1 second
-let runSeconds = 60;      // one set length: 30s / 60s / 90s (sushida style)
+let runSeconds = 60;      // one set length: 30s / 60s / 90s (sushida style)、0 = 無制限(タイムアウトなし)
 try {
   const t = +localStorage.getItem("cornixTime");
-  if ([30, 60, 90].includes(t)) runSeconds = t;
+  if ([0, 30, 60, 90].includes(t)) runSeconds = t;
 } catch (e) {}
+// 無制限モードでは残り時間ではなく経過時間をカウントアップし、自動終了しない
+const isUnlimited = () => runSeconds === 0;
+
+// 時間表示(ラベル+初期値)をモードに合わせてリセットする
+function resetTimeDisplay() {
+  const lbl = document.getElementById("stTimeLbl");
+  if (lbl) lbl.textContent = isUnlimited() ? "経過時間" : "残り時間";
+  const t = document.getElementById("stTime");
+  t.textContent = isUnlimited() ? "0.0" : runSeconds.toFixed(1);
+  t.classList.remove("low");
+}
 const $ = id => document.getElementById(id);
 
 /* ---- sound effects (WebAudio, synthesized — no asset files) ---- */
@@ -1771,7 +1783,7 @@ const engine = {
     this.running = false; this.hint = null; this.items = [];
     clearHighlights();
     $("wordMeta").textContent = ""; $("queue").textContent = ""; $("hint").innerHTML = "";
-    $("stTime").textContent = runSeconds.toFixed(1); $("stTime").classList.remove("low");
+    resetTimeDisplay();
     $("stWpm").textContent = 0; $("stAcc").textContent = "100%";
     $("stCombo").textContent = 0; $("stMiss").textContent = 0;
     this.counting = true;
@@ -1814,14 +1826,19 @@ const engine = {
       '<span class="start-prompt">▶ スタート</span>' +
       '<span class="start-sub">クリック / Space / Enter で開始　・　プレイ中は ESC で戻る</span>';
     $("wordMeta").textContent = ""; $("queue").textContent = ""; $("hint").innerHTML = "";
-    $("stTime").textContent = runSeconds.toFixed(1); $("stTime").classList.remove("low");
+    resetTimeDisplay();
     $("stWpm").textContent = 0; $("stAcc").textContent = "100%";
     $("stCombo").textContent = 0; $("stMiss").textContent = 0;
   },
 
   tick() {
-    const rem = Math.max(0, this.endTime - Date.now());
     const t = $("stTime");
+    if (isUnlimited()) {                          // 経過時間をカウントアップ、自動終了しない
+      t.textContent = ((Date.now() - this.startTime) / 1000).toFixed(1);
+      this.updateStats();
+      return;
+    }
+    const rem = Math.max(0, this.endTime - Date.now());
     t.textContent = (rem / 1000).toFixed(1);
     t.classList.toggle("low", rem < 10000);
     this.updateStats();
@@ -1833,13 +1850,15 @@ const engine = {
     this.combo++;
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
     if (this.combo % COMBO_STEP === 0) {
-      this.endTime += COMBO_BONUS * 1000;
-      this.bonusTotal += COMBO_BONUS;
-      const pop = document.createElement("span");
-      pop.className = "bonus-pop";
-      pop.textContent = "+" + COMBO_BONUS + "s";
-      $("stTimeWrap").appendChild(pop);
-      setTimeout(() => pop.remove(), 900);
+      if (!isUnlimited()) {                       // 無制限モードでは時間ボーナスは無意味なので付与しない
+        this.endTime += COMBO_BONUS * 1000;
+        this.bonusTotal += COMBO_BONUS;
+        const pop = document.createElement("span");
+        pop.className = "bonus-pop";
+        pop.textContent = "+" + COMBO_BONUS + "s";
+        $("stTimeWrap").appendChild(pop);
+        setTimeout(() => pop.remove(), 900);
+      }
       audio.play("bonus");
     } else audio.play("type");
   },
@@ -1929,6 +1948,7 @@ const engine = {
     clearInterval(this.timerId);
     this.running = false;
     this.updateStats();
+    $("rTitle").textContent = isUnlimited() ? "🎉 おつかれさま！" : "🎉 タイムアップ！";
     const score = Math.max(0, Math.round(
       this.correct * 10 + this.words * 100 + this.maxCombo * 30 - this.miss * 20));
     const rank = score >= 12000 ? "S" : score >= 9000 ? "A" : score >= 6000 ? "B"
@@ -2057,7 +2077,8 @@ document.addEventListener("keydown", e => {
   if ($("resultDlg").open) return;            // Esc closes the dialog natively
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Escape") {                   // Esc during a run/countdown = back to the pre-start menu
-    if (engine.running || engine.counting) { e.preventDefault(); engine.idle(); }
+    if (engine.running && isUnlimited()) { e.preventDefault(); engine.finish(); }  // 無制限は結果を表示して終了
+    else if (engine.running || engine.counting) { e.preventDefault(); engine.idle(); }
     return;
   }
   if (engine.counting) { e.preventDefault(); return; }  // ignore input during the 3-2-1 countdown
