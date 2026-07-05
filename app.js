@@ -1477,7 +1477,7 @@ const guided = {
   results: [], // 1走行分の記録 {t, h: {文字: [打鍵数, ミス数, 平均打鍵時間ms]}}
   stats: new Map(),
   keys: [],
-  words: [],
+  words: { en: [], jp: [], sym: [] }, // 練習モード別の出題プール
   selected: null,
 };
 
@@ -1548,15 +1548,90 @@ function guidedUpdateKeys() {
   guided.keys = keys;
 }
 
-// 解放済みキーだけで綴れて注目キーを含む単語を出題する (keybrのDictionary.find相当)
-function guidedWordPool() {
+// 解放済みキーだけで打てるお題を練習モード別に作る (keybrのDictionary.find相当)
+function guidedBuildPools() {
   const included = new Set(guided.keys.filter((k) => k.included).map((k) => k.ch));
   const focused = guided.keys.find((k) => k.focused)?.ch ?? null;
+  return {
+    en: guidedEnPool(included, focused),
+    jp: guidedJpPool(included, focused),
+    sym: guidedSymPool(included, focused),
+  };
+}
+
+// 解放済みキーだけで綴れて注目キーを含む英単語
+function guidedEnPool(included, focused) {
   let words = EN_WORDS.filter((w) => w.length > 2 && [...w].every((ch) => included.has(ch)));
   if (focused) words = words.filter((w) => w.includes(focused));
   words = words.slice(0, 1000);
   while (words.length < 15) words.push(guidedPseudoWord([...included], focused)); // 実単語が少ない序盤は疑似単語で補う
   return words;
+}
+
+// 単語の標準ローマ字表記（各入力単位の第1候補をつないだもの）
+function guidedRomajiOf(kana) {
+  return tokenizeKana(kana)
+    .map((unit) => unit.opts[0] || "")
+    .join("");
+}
+
+// 標準ローマ字が解放済みキーだけで打てる日本語単語
+function guidedJpPool(included, focused) {
+  const typeable = JP_WORDS.filter(([kana]) => [...guidedRomajiOf(kana)].every((ch) => included.has(ch)));
+  let pool = focused ? typeable.filter(([kana]) => guidedRomajiOf(kana).includes(focused)) : typeable;
+  if (pool.length < 5) pool = typeable;
+  pool = pool.slice();
+  while (pool.length < 5) pool.push(guidedPseudoKana(included, focused));
+  return pool;
+}
+
+// 解放済みキーだけで打てるかなを組み合わせた疑似単語（[かな, 表示] 形式）
+function guidedPseudoKana(included, focused) {
+  const kanas = Object.keys(ROMAJI).filter(
+    (kana) => !"んっ".includes(kana) && [...ROMAJI[kana][0]].every((ch) => included.has(ch)),
+  );
+  if (!kanas.length) return ["あ", "あ"];
+  let word = "";
+  const len = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < len; i++) word += kanas[Math.floor(Math.random() * kanas.length)];
+  if (focused) {
+    const withFocus = kanas.filter((kana) => ROMAJI[kana][0].includes(focused));
+    if (withFocus.length) word += withFocus[Math.floor(Math.random() * withFocus.length)];
+  }
+  return [word, word];
+}
+
+// 英字部分が解放済みキーだけの記号行（不足分は識別子+記号のテンプレートで生成）
+function guidedSymPool(included, focused) {
+  const lettersOk = (item) => [...item.toLowerCase()].filter((ch) => /[a-z]/.test(ch)).every((ch) => included.has(ch));
+  let pool = SYM_ITEMS.filter(lettersOk);
+  if (focused) {
+    const withFocus = pool.filter((item) => item.toLowerCase().includes(focused));
+    if (withFocus.length) pool = withFocus;
+  }
+  pool = pool.slice();
+  while (pool.length < 8) pool.push(guidedSymLine(included, focused));
+  return pool;
+}
+
+function guidedSymLine(included, focused) {
+  const letters = [...included];
+  const ident = (f) => guidedPseudoWord(letters, f).slice(0, 4);
+  const a = ident(focused);
+  const b = ident(null);
+  const c = ident(null);
+  const templates = [
+    a + " = (" + b + " + " + c + ");",
+    a + " && " + b + " || !" + c,
+    a + '[0] = "' + b + '";',
+    "(" + a + ") => " + a + " * 2",
+    a + " += " + b + " - " + c + ";",
+    a + "_" + b + "-" + c + "." + a,
+    "/^[" + a + "]+$/",
+    a + " ? " + b + " : " + c + ";",
+    "{ " + a + ': "' + b + '" }',
+  ];
+  return templates[Math.floor(Math.random() * templates.length)];
 }
 
 function guidedPseudoWord(letters, focused) {
@@ -1915,6 +1990,7 @@ function drawFrom(list, key) {
 
 const engine = {
   mode: "en",
+  guided: false, // キー習得モード（練習モードと直交する切替）
   items: [],
   idx: 0,
   running: false,
@@ -1952,7 +2028,14 @@ const engine = {
       const r = Math.random();
       mode = r < 0.35 ? "en" : r < 0.7 ? "jp" : "sym";
     }
-    if (mode === "guided") return { text: drawFrom(guided.words, "guided"), meta: "" };
+    if (this.guided) {
+      if (mode === "jp") {
+        const w = drawFrom(guided.words.jp, "g_jp");
+        return { kana: w[0], meta: w[1] };
+      }
+      if (mode === "sym") return { text: drawFrom(guided.words.sym, "g_sym"), meta: "" };
+      return { text: drawFrom(guided.words.en, "g_en"), meta: "" };
+    }
     if (mode === "en")
       return Math.random() < 0.2
         ? { text: drawFrom(EN_SENTS, "ens"), meta: "" }
@@ -2018,11 +2101,11 @@ const engine = {
 
   beginRun() {
     clearInterval(this.timerId);
-    if (this.mode === "guided") {
-      // 最新の習得状況で出題単語を作り直す
+    if (this.guided) {
+      // 最新の習得状況で出題プールを作り直す
       guidedUpdateKeys();
-      guided.words = guidedWordPool();
-      bags.guided = null;
+      guided.words = guidedBuildPools();
+      bags.g_en = bags.g_jp = bags.g_sym = null;
       this.steps = [];
       this.lastInputAt = 0;
       this.typoPending = false;
@@ -2152,12 +2235,12 @@ const engine = {
   inputText(c) {
     const t = this.text[this.pos];
     if (c === t) {
-      if (this.mode === "guided") this.recordStep(t);
+      if (this.guided) this.recordStep(t);
       this.pos++;
       this.onCorrect();
       if (this.pos >= this.text.length) return this.nextItem();
     } else {
-      if (this.mode === "guided") this.typoPending = true;
+      if (this.guided) this.typoPending = true;
       this.onMiss();
     }
     this.render();
@@ -2178,6 +2261,7 @@ const engine = {
     const nt = this.typed + c;
     const ok = u.opts.some((o) => o.startsWith(nt));
     if (ok) {
+      if (this.guided) this.recordStep(c); // ローマ字1打鍵として記録
       this.typed = nt;
       this.onCorrect();
       const exact = u.opts.includes(nt);
@@ -2193,6 +2277,7 @@ const engine = {
       this.finishUnit();
       return this.input(c); // re-route: the next item may not be Japanese (mix mode)
     }
+    if (this.guided) this.typoPending = true;
     this.onMiss();
     this.render();
     this.refreshHint();
@@ -2220,7 +2305,7 @@ const engine = {
     this.updateStats();
     const unlock = $("rUnlock");
     unlock.hidden = true;
-    if (this.mode === "guided" && this.steps.length) {
+    if (this.guided && this.steps.length) {
       const unlocked = guidedRecordRun(this.steps);
       this.steps = [];
       if (unlocked.length) {
@@ -2429,8 +2514,18 @@ document.querySelectorAll(".modes button").forEach((b) => {
     });
     b.classList.add("active");
     engine.mode = b.dataset.mode;
-    $("guided").hidden = engine.mode !== "guided";
-    if (engine.mode === "guided") guidedRenderAll();
+    engine.idle();
+  });
+});
+document.querySelectorAll(".playstyle button").forEach((b) => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".playstyle button").forEach((x) => {
+      x.classList.remove("active");
+    });
+    b.classList.add("active");
+    engine.guided = b.dataset.guided === "1";
+    $("guided").hidden = !engine.guided;
+    if (engine.guided) guidedRenderAll();
     engine.idle();
   });
 });

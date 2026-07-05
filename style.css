@@ -191,8 +191,13 @@ button:disabled {
   display: flex;
   gap: 4px;
 }
+.playstyle {
+  display: flex;
+  gap: 4px;
+}
 .modes button,
-.times button {
+.times button,
+.playstyle button {
   padding: 4px 8px;
   font-size: 10.5px;
   box-shadow: 0 2px 0 var(--border);
@@ -220,6 +225,12 @@ button:disabled {
   border-color: #18b566;
   color: #fff;
   box-shadow: 0 2px 0 #0e8a4c;
+}
+.playstyle button.active {
+  background: linear-gradient(90deg, var(--accent), #ff8fb0);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 0 #d94a78;
 }
 /* ステータスは枠なしで大きく見やすく、中央揃え */
 .statbar {
@@ -876,7 +887,8 @@ dialog::backdrop {
     font-size: 10px;
   }
   .modes button,
-  .times button {
+  .times button,
+  .playstyle button {
     padding: 5px 9px;
     font-size: 11px;
   }

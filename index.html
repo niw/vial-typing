@@ -23,13 +23,25 @@
     <section class="panel">
       <div class="toolbar">
         <div class="ctrl-group">
+          <span class="ctrl-label">モード</span>
+          <div class="playstyle">
+            <button type="button" data-guided="0" class="active">通常</button>
+            <button
+              type="button"
+              data-guided="1"
+              title="タイピング履歴に応じてキーを解放し、解放済みキーだけで打てるお題を出す"
+            >
+              キー習得
+            </button>
+          </div>
+        </div>
+        <div class="ctrl-group">
           <span class="ctrl-label">練習モード</span>
           <div class="modes">
             <button type="button" data-mode="en" class="active">英単語・英文</button>
             <button type="button" data-mode="jp">日本語ローマ字</button>
             <button type="button" data-mode="sym">記号・レイヤー</button>
             <button type="button" data-mode="mix">ミックス</button>
-            <button type="button" data-mode="guided">キー習得</button>
           </div>
         </div>
         <div class="ctrl-group">
