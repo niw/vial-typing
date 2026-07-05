@@ -298,6 +298,11 @@ button:disabled {
   font-weight: 700;
   color: var(--accent2);
 }
+#btnGuidedReset {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 4px 10px;
+}
 #keyset {
   display: flex;
   flex-wrap: wrap;

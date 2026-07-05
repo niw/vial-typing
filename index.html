@@ -15,7 +15,7 @@
       <button type="button" id="btnConnect" class="primary">🔌 キーボードから読み取る</button>
       <button type="button" id="btnVil">📄 .vilを開く</button>
       <button type="button" id="btnForget" title="保存したレイアウト・キーマップを消して未読込に戻す" hidden>
-        🗑 保存を消す
+        🗑 キーマップを消す
       </button>
       <input type="file" id="vilFile" accept=".vil,application/json" hidden>
     </header>
@@ -86,6 +86,9 @@
         <div class="guided-head">
           <span class="title">🔓 タイピング履歴に応じてキーが解放され、出題単語が変わります</span>
           <span id="guidedStatus"></span>
+          <button type="button" id="btnGuidedReset" title="キー習得モードの練習履歴を消して未習得の状態に戻す">
+            🗑 履歴を消す
+          </button>
         </div>
         <div id="keyset"></div>
         <div class="guided-detail">

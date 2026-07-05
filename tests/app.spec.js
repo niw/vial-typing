@@ -69,6 +69,7 @@ test("キー習得モードでキー一覧とグラフを表示する", async ({
   await expect(page.locator("#keyset .gkey.focused")).toHaveCount(1);
   await expect(page.locator("#keyInfo")).toContainText("未計測");
   await expect(page.locator("#keyChart")).toBeVisible();
+  await expect(page.locator("#btnGuidedReset")).toBeDisabled(); // 履歴が無いうちは消せない
 });
 
 test("既存キーがすべて目標速度に達すると次のキーが解放される", async ({ page }) => {
@@ -121,4 +122,22 @@ test("全キーが目標速度に達すると解放完了の表示になる", as
   await page.getByRole("button", { name: "キー習得" }).click();
   await expect(page.locator("#keyset .gkey.locked")).toHaveCount(0);
   await expect(page.locator("#guidedStatus")).toContainText("すべてのキーを解放しました");
+});
+
+test("履歴を消すボタンで未習得の状態に戻る", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const histogram = {};
+    for (const ch of "abcdefghijklmnopqrstuvwxyz") histogram[ch] = [10, 0, 200];
+    localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "キー習得" }).click();
+  await expect(page.locator("#keyset .gkey.locked")).toHaveCount(0);
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "履歴を消す" }).click();
+  await expect(page.locator("#keyset .gkey.locked")).toHaveCount(20);
+  await expect(page.locator("#btnGuidedReset")).toBeDisabled();
+  const stored = await page.evaluate(() => localStorage.getItem("vialTypingGuided"));
+  expect(stored).toBeNull();
 });

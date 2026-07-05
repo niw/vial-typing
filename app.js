@@ -1828,6 +1828,7 @@ function guidedRenderAll() {
   $("guidedStatus").textContent = focused
     ? "習得中のキー: " + focused.ch.toUpperCase()
     : "🎉 すべてのキーを解放しました";
+  $("btnGuidedReset").disabled = !guided.results.length;
   renderKeySet();
   const key = guidedSelectedKey();
   renderKeyInfo(key);
@@ -2507,6 +2508,17 @@ $("btnSound").addEventListener("click", () => {
   } catch {}
   updateSoundBtn();
   if (soundOn) audio.play("type"); // confirmation blip
+});
+$("btnGuidedReset").addEventListener("click", () => {
+  if (!confirm("キー習得モードの練習履歴を消します。よろしいですか？")) return;
+  guided.results = [];
+  guided.selected = null;
+  try {
+    localStorage.removeItem(GUIDED_STORE_KEY);
+  } catch {}
+  guidedRebuildStats();
+  guidedUpdateKeys();
+  guidedRenderAll();
 });
 
 /* ---------- startup ---------- */
