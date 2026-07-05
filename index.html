@@ -1,128 +1,151 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="google-site-verification" content="jjM0-yhpH3z17_a3F6Dc4mmCanebiDxJ3noOOb3zsXQ" />
-<title>Vial Typing — キーマップ連動タイピング練習</title>
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="jjM0-yhpH3z17_a3F6Dc4mmCanebiDxJ3noOOb3zsXQ">
+    <title>Vial Typing — キーマップ連動タイピング練習</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <h1>Vial <span>Typing</span></h1>
+      <div class="sub">Vial対応キーボードのレイアウトとキーマップを読み取って練習</div>
+      <div id="status">キーボード未読込</div>
+      <button type="button" id="btnConnect" class="primary">🔌 キーボードから読み取る</button>
+      <button type="button" id="btnVil">📄 .vilを開く</button>
+      <button type="button" id="btnForget" title="保存したレイアウト・キーマップを消して未読込に戻す" hidden>
+        🗑 保存を消す
+      </button>
+      <input type="file" id="vilFile" accept=".vil,application/json" hidden>
+    </header>
 
-<header>
-  <h1>Vial <span>Typing</span></h1>
-  <div class="sub">Vial対応キーボードのレイアウトとキーマップを読み取って練習</div>
-  <div id="status">キーボード未読込</div>
-  <button id="btnConnect" class="primary">🔌 キーボードから読み取る</button>
-  <button id="btnVil">📄 .vilを開く</button>
-  <button id="btnForget" title="保存したレイアウト・キーマップを消して未読込に戻す" hidden>🗑 保存を消す</button>
-  <input type="file" id="vilFile" accept=".vil,application/json" hidden>
-</header>
-
-<section class="panel">
-  <div class="toolbar">
-    <div class="ctrl-group">
-      <span class="ctrl-label">練習モード</span>
-      <div class="modes">
-        <button data-mode="en" class="active">英単語・英文</button>
-        <button data-mode="jp">日本語ローマ字</button>
-        <button data-mode="sym">記号・レイヤー</button>
-        <button data-mode="mix">ミックス</button>
+    <section class="panel">
+      <div class="toolbar">
+        <div class="ctrl-group">
+          <span class="ctrl-label">練習モード</span>
+          <div class="modes">
+            <button type="button" data-mode="en" class="active">英単語・英文</button>
+            <button type="button" data-mode="jp">日本語ローマ字</button>
+            <button type="button" data-mode="sym">記号・レイヤー</button>
+            <button type="button" data-mode="mix">ミックス</button>
+          </div>
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">プレイ時間</span>
+          <div class="times">
+            <button type="button" data-time="30">30秒</button>
+            <button type="button" data-time="60" class="active">60秒</button>
+            <button type="button" data-time="90">90秒</button>
+            <button type="button" data-time="0">無制限</button>
+          </div>
+        </div>
+        <div class="ctrl-group settings">
+          <span class="ctrl-label">設定</span>
+          <div class="settings-row">
+            <button type="button" id="btnSound" title="効果音のON/OFF">🔊 音あり</button>
+            <label
+              class="pref"
+              title="文字の出方の解釈。『US互換』= OSがUS設定で変換なし、またはOSがJIS設定でファームウェアがUS刻印通りに変換する場合。『JIS互換』= OSがJIS設定で変換なし、またはOSがUS設定でファームウェアがJIS刻印通りに変換する場合"
+              >配列
+              <select id="selOut">
+                <option value="us">US互換</option>
+                <option value="jis">JIS互換</option>
+              </select>
+            </label>
+            <label class="pref" title="同じ文字を複数の方法で入力できる場合に、どの打ち方を案内するか"
+              >入力案内
+              <select id="selPref">
+                <option value="auto">自動（おすすめ）</option>
+                <option value="shift">Shift優先</option>
+                <option value="layer">レイヤー優先</option>
+              </select>
+            </label>
+            <label class="pref" title="数字をどのレイヤーで打つかを固定する"
+              >数字
+              <select id="selNumLayer"></select>
+            </label>
+            <label class="pref" title="記号をどのレイヤーで打つかを固定する"
+              >記号
+              <select id="selSymLayer"></select>
+            </label>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="ctrl-group">
-      <span class="ctrl-label">プレイ時間</span>
-      <div class="times">
-        <button data-time="30">30秒</button>
-        <button data-time="60" class="active">60秒</button>
-        <button data-time="90">90秒</button>
-        <button data-time="0">無制限</button>
+      <div class="statbar">
+        <div class="stat time" id="stTimeWrap">
+          <span class="lbl" id="stTimeLbl">残り時間</span><b id="stTime">60.0</b>
+        </div>
+        <div class="stat"><span class="lbl">WPM</span><b id="stWpm">0</b></div>
+        <div class="stat"><span class="lbl">正確率</span><b id="stAcc">100%</b></div>
+        <div class="stat"><span class="lbl">コンボ</span><b id="stCombo">0</b></div>
+        <div class="stat"><span class="lbl">ミス</span><b id="stMiss">0</b></div>
       </div>
-    </div>
-    <div class="ctrl-group settings">
-      <span class="ctrl-label">設定</span>
-      <div class="settings-row">
-        <button id="btnSound" title="効果音のON/OFF">🔊 音あり</button>
-        <label class="pref" title="文字の出方の解釈。『US互換』= OSがUS設定で変換なし、またはOSがJIS設定でファームウェアがUS刻印通りに変換する場合。『JIS互換』= OSがJIS設定で変換なし、またはOSがUS設定でファームウェアがJIS刻印通りに変換する場合">配列
-          <select id="selOut">
-            <option value="us">US互換</option>
-            <option value="jis">JIS互換</option>
-          </select>
-        </label>
-        <label class="pref" title="同じ文字を複数の方法で入力できる場合に、どの打ち方を案内するか">入力案内
-          <select id="selPref">
-            <option value="auto">自動（おすすめ）</option>
-            <option value="shift">Shift優先</option>
-            <option value="layer">レイヤー優先</option>
-          </select>
-        </label>
-        <label class="pref" title="数字をどのレイヤーで打つかを固定する">数字
-          <select id="selNumLayer"></select>
-        </label>
-        <label class="pref" title="記号をどのレイヤーで打つかを固定する">記号
-          <select id="selSymLayer"></select>
-        </label>
+      <div id="wordMeta"></div>
+      <div id="typeline" class="mono"></div>
+      <div id="hint"></div>
+      <div id="queue" class="mono"></div>
+    </section>
+
+    <section class="panel">
+      <div class="kb-head">
+        <div class="title">キーボード（表示レイヤーを選択 / 入力時は自動切替）</div>
+        <div class="layertabs" id="layertabs"></div>
       </div>
-    </div>
-  </div>
-  <div class="statbar">
-    <div class="stat time" id="stTimeWrap"><span class="lbl" id="stTimeLbl">残り時間</span><b id="stTime">60.0</b></div>
-    <div class="stat"><span class="lbl">WPM</span><b id="stWpm">0</b></div>
-    <div class="stat"><span class="lbl">正確率</span><b id="stAcc">100%</b></div>
-    <div class="stat"><span class="lbl">コンボ</span><b id="stCombo">0</b></div>
-    <div class="stat"><span class="lbl">ミス</span><b id="stMiss">0</b></div>
-  </div>
-  <div id="wordMeta"></div>
-  <div id="typeline" class="mono"></div>
-  <div id="hint"></div>
-  <div id="queue" class="mono"></div>
-</section>
+      <div id="kbwrap"><div id="kb"></div></div>
+      <div class="legend">
+        <span><i class="lt"></i>押すキー</span>
+        <span><i class="ls"></i>Shiftを押しながら</span>
+        <span><i class="ll"></i>レイヤーキーを押しながら</span>
+      </div>
+      <details class="note" id="dbgwrap" style="margin-top:12px;">
+        <summary style="cursor:pointer;">🔍 読み取りログ（うまく動かないときはここを確認）</summary>
+        <button type="button" id="btnDefDl" style="margin-top:6px; font-size:11px; padding:4px 10px;">
+          読み取った定義をvial.jsonとして保存
+        </button>
+        <pre
+          id="dbglog"
+          class="mono"
+          style="white-space:pre-wrap; font-size:11px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:8px; margin-top:6px;"
+        >（まだ読み取りを実行していません）</pre>
+      </details>
+      <div class="note">
+        ・<b>読み取り方法:</b>
+        Vial対応キーボードをUSBケーブルで接続し「キーボードから読み取る」を押すと、レイアウト定義とキーマップを自動で読み取ります（Chrome
+        / Edge、WebHID対応ブラウザが必要）。<br>
+        ・レイアウトの展開（xz/lzma）にはCDNのデコーダを使います。オフライン等で失敗する場合は、キーボードの
+        <code>vial.json</code>
+        をドロップしてレイアウトを適用後、<a href="https://vial.rocks" target="_blank" style="color:var(--accent)"
+          >Vial</a
+        >
+        でエクスポートした <code>.vil</code> をドロップしてください。<br>
+        ・日本語ローマ字モードでは IME（日本語入力）を<b>オフ</b>にしてください。ローマ字は ヘボン式/訓令式
+        どちらでも入力できます。
+      </div>
+    </section>
 
-<section class="panel">
-  <div class="kb-head">
-    <div class="title">キーボード（表示レイヤーを選択 / 入力時は自動切替）</div>
-    <div class="layertabs" id="layertabs"></div>
-  </div>
-  <div id="kbwrap"><div id="kb"></div></div>
-  <div class="legend">
-    <span><i class="lt"></i>押すキー</span>
-    <span><i class="ls"></i>Shiftを押しながら</span>
-    <span><i class="ll"></i>レイヤーキーを押しながら</span>
-  </div>
-  <details class="note" id="dbgwrap" style="margin-top:12px;">
-    <summary style="cursor:pointer;">🔍 読み取りログ（うまく動かないときはここを確認）</summary>
-    <button id="btnDefDl" style="margin-top:6px; font-size:11px; padding:4px 10px;">読み取った定義をvial.jsonとして保存</button>
-    <pre id="dbglog" class="mono" style="white-space:pre-wrap; font-size:11px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:8px; margin-top:6px;">（まだ読み取りを実行していません）</pre>
-  </details>
-  <div class="note">
-    ・<b>読み取り方法:</b> Vial対応キーボードをUSBケーブルで接続し「キーボードから読み取る」を押すと、レイアウト定義とキーマップを自動で読み取ります（Chrome / Edge、WebHID対応ブラウザが必要）。<br>
-    ・レイアウトの展開（xz/lzma）にはCDNのデコーダを使います。オフライン等で失敗する場合は、キーボードの <code>vial.json</code> をドロップしてレイアウトを適用後、<a href="https://vial.rocks" target="_blank" style="color:var(--accent)">Vial</a> でエクスポートした <code>.vil</code> をドロップしてください。<br>
-    ・日本語ローマ字モードでは IME（日本語入力）を<b>オフ</b>にしてください。ローマ字は ヘボン式/訓令式 どちらでも入力できます。
-  </div>
-</section>
+    <div id="drop">.vil / vial.json をドロップして読み込み</div>
 
-<div id="drop">.vil / vial.json をドロップして読み込み</div>
+    <dialog id="resultDlg">
+      <h2 id="rTitle" style="font-size:18px; text-align:center;">🎉 タイムアップ！</h2>
+      <div class="score-hero">
+        <div class="rank" id="rRank">A</div>
+        <div class="num" id="rScore">0</div>
+        <div class="unit">pt</div>
+      </div>
+      <div class="score-formula">スコア = 正解打鍵×10 ＋ ワード×100 ＋ 最大コンボ×30 − ミス×20</div>
+      <div class="result-grid">
+        <div><b id="rWpm">0</b><span>WPM</span></div>
+        <div><b id="rAcc">0%</b><span>正確率</span></div>
+        <div><b id="rWords">0</b><span>入力ワード数</span></div>
+        <div><b id="rCombo">0</b><span>最大コンボ</span></div>
+        <div><b id="rMiss">0</b><span>ミス数</span></div>
+        <div><b id="rBonus">+0s</b><span>獲得ボーナス</span></div>
+      </div>
+      <div style="text-align:center"><button type="button" class="primary" id="btnAgain">もう一度</button></div>
+      <div style="text-align:center; font-size:12px; color:var(--dim); margin-top:12px;">ESCキーでメニューに戻る</div>
+    </dialog>
 
-<dialog id="resultDlg">
-  <h2 id="rTitle" style="font-size:18px; text-align:center;">🎉 タイムアップ！</h2>
-  <div class="score-hero">
-    <div class="rank" id="rRank">A</div>
-    <div class="num" id="rScore">0</div>
-    <div class="unit">pt</div>
-  </div>
-  <div class="score-formula">スコア = 正解打鍵×10 ＋ ワード×100 ＋ 最大コンボ×30 − ミス×20</div>
-  <div class="result-grid">
-    <div><b id="rWpm">0</b><span>WPM</span></div>
-    <div><b id="rAcc">0%</b><span>正確率</span></div>
-    <div><b id="rWords">0</b><span>入力ワード数</span></div>
-    <div><b id="rCombo">0</b><span>最大コンボ</span></div>
-    <div><b id="rMiss">0</b><span>ミス数</span></div>
-    <div><b id="rBonus">+0s</b><span>獲得ボーナス</span></div>
-  </div>
-  <div style="text-align:center"><button class="primary" id="btnAgain">もう一度</button></div>
-  <div style="text-align:center; font-size:12px; color:var(--dim); margin-top:12px;">ESCキーでメニューに戻る</div>
-</dialog>
-
-<script type="module" src="app.js"></script>
-</body>
+    <script type="module" src="app.js"></script>
+  </body>
 </html>

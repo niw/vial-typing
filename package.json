@@ -1,0 +1,13 @@
+{
+  "name": "vial-typing",
+  "private": true,
+  "scripts": {
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@playwright/test": "^1.61.1"
+  }
+}
