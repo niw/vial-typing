@@ -1,6 +1,6 @@
 # Vial Typing
 
-Vial対応キーボード全般で使えるタイピング練習サイト。
+Vial対応キーボード全般で使えるタイピング練習ソフト。
 
 接続したキーボードから**レイアウト定義とキーマップを直接読み取り**、次に押すべきキー（レイヤーキー・Shiftの押し順を含む）をキーボード図上にインジケータ表示します。[Cornix](https://en.zfrontier.com/products/in-stock-cornix-tented-low-profile-split-ergo-keyboard-by-jezail-funder)（Jezail Funder）向けに開発し、汎用化したものです。
 
@@ -44,8 +44,11 @@ npm run tauri:build   # .app / .dmg をビルド
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+The original [Vial Typing](https://github.com/shakushakupanda/vial-typing) is licensed under the [MIT License](LICENSE).
 
-- 出題単語リスト（`data/en_words.json` と `data/jp_words.json` の一部）は
-  [keybr.com](https://github.com/aradzie/keybr.com)（AGPL-3.0）の頻度順単語データから生成しています。
-- キー習得モードの解放アルゴリズムも keybr.com の guided lesson を参考にしています。
+This modified version of Vial Typing is licensed under the [MIT License](LICENSE).
+The changes are made with havily using Claude Code Fable 5 and Opus 4.8.
+
+Some of the word lists used for practice (part of `data/en_words.json` and `data/jp_words.json`) are generated from the frequency-ordered word data of [keybr.com](https://github.com/aradzie/keybr.com), which are licensed under the [AGPL-3.0](LICENSE).
+
+The unlock algorithm for the key-mastery mode is also based on [keybr.com](https://github.com/aradzie/keybr.com)'s guided lesson, which are also licensed under the [AGPL-3.0](LICENSE).
