@@ -15,8 +15,12 @@ Vial対応キーボード全般で使えるタイピング練習サイト。
 
 ## 使い方
 
-ブラウザ（Chrome / Edge 推奨。WebHIDが必要）で開き、「キーボードから読み取る」を押すだけ。ビルド不要の単一HTMLファイルです。
+ブラウザ（Chrome / Edge 推奨。WebHIDが必要）で開き、「キーボードから読み取る」を押すだけ。`make run` でローカルhttpサーバーが立ちます。
 
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+
+- 出題単語リスト（`data/en_words.json` と `data/jp_words.json` の一部）は
+  [keybr.com](https://github.com/aradzie/keybr.com)（AGPL-3.0）の頻度順単語データから生成しています。
+- キー習得モードの解放アルゴリズムも keybr.com の guided lesson を参考にしています。
