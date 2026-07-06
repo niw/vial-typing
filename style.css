@@ -153,6 +153,45 @@ button:disabled {
   margin-bottom: 16px;
   box-shadow: 0 6px 20px rgba(255, 93, 143, 0.08);
 }
+.layout {
+  width: 100%;
+  max-width: 1080px;
+}
+.main {
+  min-width: 0;
+}
+
+/* 幅の広い画面では設定と統計を左サイドバーに寄せて横長レイアウトにする */
+@media (min-width: 1400px) {
+  header,
+  .layout {
+    max-width: 1560px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+  .layout .side {
+    position: sticky;
+    top: 12px;
+  }
+  .side .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .side .statbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 8px;
+    margin-bottom: 0;
+  }
+  .side .statbar .stat.time {
+    grid-column: 1 / -1;
+  }
+}
 
 /* ---- mode tabs & stats ---- */
 /* 「練習モード」「プレイ時間」「設定」を1行に収める（狭い画面では折り返す） */

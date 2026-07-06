@@ -60,6 +60,25 @@ test("キーボード未読込で開始すると案内を表示する", async ({
   await expect(page.locator("#typeline")).toContainText("先にキーボードを読み込んでください");
 });
 
+test("幅の広い画面では設定と統計が左サイドバーになる", async ({ page }) => {
+  await page.setViewportSize({ width: 1680, height: 900 });
+  await page.goto("/");
+  const display = await page.locator(".layout").evaluate((el) => getComputedStyle(el).display);
+  expect(display).toBe("grid");
+  const side = await page.locator(".side").boundingBox();
+  const main = await page.locator(".main").boundingBox();
+  expect(side.x + side.width).toBeLessThanOrEqual(main.x + 1);
+  expect(Math.abs(side.y - main.y)).toBeLessThan(30);
+});
+
+test("狭い画面では従来どおり縦積みになる", async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.goto("/");
+  const side = await page.locator(".side").boundingBox();
+  const main = await page.locator(".main").boundingBox();
+  expect(main.y).toBeGreaterThan(side.y + side.height - 1);
+});
+
 test("押すべきキーとヒントに指番号が表示される", async ({ page }) => {
   await page.goto("/");
   await page.evaluate((keymap) => {
