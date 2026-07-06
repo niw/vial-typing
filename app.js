@@ -1463,6 +1463,65 @@ const ROMAJI = {
     for (const [sm, v] of Object.entries(V)) ROMAJI[k + sm] = pres.map((p) => p + v);
 })();
 
+// ローマ字の案内表記スタイル。第1候補(=案内に使う綴り)を並べ替えるだけで、
+// どちらのスタイルの綴りでも入力自体は常に受け付ける
+const ROMAJI_STYLE_PREFS = {
+  hepburn: {
+    し: "shi",
+    ち: "chi",
+    つ: "tsu",
+    ふ: "fu",
+    じ: "ji",
+    しゃ: "sha",
+    しゅ: "shu",
+    しょ: "sho",
+    ちゃ: "cha",
+    ちゅ: "chu",
+    ちょ: "cho",
+    じゃ: "ja",
+    じゅ: "ju",
+    じょ: "jo",
+    しぇ: "she",
+    ちぇ: "che",
+    じぇ: "je",
+  },
+  kunrei: {
+    し: "si",
+    ち: "ti",
+    つ: "tu",
+    ふ: "hu",
+    じ: "zi",
+    しゃ: "sya",
+    しゅ: "syu",
+    しょ: "syo",
+    ちゃ: "tya",
+    ちゅ: "tyu",
+    ちょ: "tyo",
+    じゃ: "zya",
+    じゅ: "zyu",
+    じょ: "zyo",
+    しぇ: "sye",
+    ちぇ: "tye",
+    じぇ: "zye",
+  },
+};
+let romajiStyle = "hepburn";
+try {
+  if (localStorage.getItem("cornixRomaji") === "kunrei") romajiStyle = "kunrei";
+} catch {}
+
+function applyRomajiStyle() {
+  for (const [kana, preferred] of Object.entries(ROMAJI_STYLE_PREFS[romajiStyle])) {
+    const opts = ROMAJI[kana];
+    const at = opts.indexOf(preferred);
+    if (at > 0) {
+      opts.splice(at, 1);
+      opts.unshift(preferred);
+    }
+  }
+}
+applyRomajiStyle();
+
 function tokenizeKana(word) {
   const units = [];
   let i = 0;
@@ -1695,6 +1754,16 @@ function guidedRomajiOf(kana) {
   return tokenizeKana(kana)
     .map((unit) => unit.opts[0] || "")
     .join("");
+}
+
+// ローマ字スタイル変更後に日本語コースの解放順を再計算する
+function guidedRefreshJpCourse() {
+  GUIDED_COURSES.jp.letters = guidedFrequencyOrder(
+    JP_WORDS.map(([kana]) => guidedRomajiOf(kana)),
+    guidedIsLetter,
+  );
+  guidedUpdateKeys();
+  if (!$("guided").hidden) guidedRenderAll();
 }
 
 // 標準ローマ字が解放済みキーだけで打てる日本語単語
@@ -2742,6 +2811,16 @@ $("selPref").addEventListener("change", () => {
   } catch {}
   charCache.clear(); // recompute guidance with the new preference
   engine.refreshHint();
+});
+$("selRomaji").value = romajiStyle;
+$("selRomaji").addEventListener("change", () => {
+  romajiStyle = $("selRomaji").value;
+  try {
+    localStorage.setItem("cornixRomaji", romajiStyle);
+  } catch {}
+  applyRomajiStyle();
+  guidedRefreshJpCourse();
+  engine.idle(); // 走行中の単語は古い綴りのままなので仕切り直す
 });
 for (const [id, key, store] of [
   ["selNumLayer", "num", "cornixNumLayer"],

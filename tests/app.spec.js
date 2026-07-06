@@ -60,6 +60,14 @@ test("キーボード未読込で開始すると案内を表示する", async ({
   await expect(page.locator("#typeline")).toContainText("先にキーボードを読み込んでください");
 });
 
+test("ローマ字スタイルはヘボン式が既定でリロード後も保持される", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("#selRomaji")).toHaveValue("hepburn");
+  await page.selectOption("#selRomaji", "kunrei");
+  await page.reload();
+  await expect(page.locator("#selRomaji")).toHaveValue("kunrei");
+});
+
 test("幅の広い画面では設定と統計が左サイドバーになる", async ({ page }) => {
   await page.setViewportSize({ width: 1680, height: 900 });
   await page.goto("/");

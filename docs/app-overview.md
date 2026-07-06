@@ -78,6 +78,8 @@ flowchart TD
 ## 6a. Romaji engine — ローマ字エンジン
 
 - `ROMAJI`: かな → ローマ字候補の表（ヘボン式・訓令式の両対応、拗音は自動生成）。
+- `applyRomajiStyle()`: 設定「ローマ字」（ヘボン式/訓令式）に応じて各候補配列の先頭＝案内に使う綴りを
+  並べ替える。入力自体はどちらの綴りも常に受け付ける。
 - `tokenizeKana()`: かな文字列を入力単位（unit）列に分解。「っ」は次の子音の重ねと `ltu/xtu/ltsu`、
   「ん」は次の文字に応じて `n`/`nn`/`xn` を許容するなど、文脈依存の候補を展開する。
 
@@ -172,6 +174,7 @@ stateDiagram-v2
 | `cornixTime` | プレイ時間（0/30/60/90） |
 | `cornixOutMode` | 配列解釈（us/jis） |
 | `cornixPref` | 入力案内の優先（auto/shift/layer） |
+| `cornixRomaji` | ローマ字の案内表記（hepburn/kunrei） |
 | `cornixNumLayer` / `cornixSymLayer` | 数字/記号のレイヤー固定 |
 | `cornixSound` | 効果音 ON/OFF |
 

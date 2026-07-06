@@ -75,6 +75,13 @@
                   <option value="layer">レイヤー優先</option>
                 </select>
               </label>
+              <label class="pref" title="日本語ローマ字の案内に使う綴り。どちらのスタイルの綴りでも入力はできます"
+                >ローマ字
+                <select id="selRomaji">
+                  <option value="hepburn">ヘボン式</option>
+                  <option value="kunrei">訓令式</option>
+                </select>
+              </label>
               <label class="pref" title="数字をどのレイヤーで打つかを固定する"
                 >数字
                 <select id="selNumLayer"></select>
@@ -156,7 +163,7 @@
             >
             でエクスポートした <code>.vil</code> をドロップしてください。<br>
             ・日本語ローマ字モードでは IME（日本語入力）を<b>オフ</b>にしてください。ローマ字は ヘボン式/訓令式
-            どちらでも入力できます。
+            どちらでも入力できます（案内に使う綴りは設定の「ローマ字」で切替）。
           </div>
         </section>
       </div>
