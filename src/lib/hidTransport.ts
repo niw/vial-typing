@@ -1,5 +1,7 @@
 // HIDトランスポートの抽象。プロトコル処理(hid.ts)はこのインターフェース越しに動くので、
 // ブラウザ(WebHID)とTauri(Rust hidapi)を実行時に差し替えられる
+import { isTauri } from "./platform";
+
 export interface HidConnection {
   label: string; // ログ・ステータス表示に使うデバイス名
   vendorId?: number;
@@ -12,10 +14,6 @@ export interface HidTransport {
   available: boolean; // この環境でHIDが使えるか
   open(): Promise<HidConnection | null>; // デバイスを選択して接続。キャンセル時はnull
 }
-
-// Tauri(WKWebView)内かどうか。ここでのみTauri実装を動的importするので、
-// webバンドルには@tauri-apps/apiが一切含まれない
-const isTauri = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export async function getHidTransport(): Promise<HidTransport> {
   if (isTauri()) {

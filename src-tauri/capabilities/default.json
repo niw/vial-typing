@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "コアの既定権限。HID関連のコマンドはアプリ独自コマンドなので追加権限は不要",
+  "description": "コアの既定権限。HID・ファイル読み書きはアプリ独自コマンドなので追加権限は不要。保存/開くダイアログのみplugin-dialogの権限が要る",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:default"]
 }

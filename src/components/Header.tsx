@@ -1,9 +1,10 @@
 import "./Header.css";
 import { useRef } from "react";
-import { downloadBackup, loadFileText } from "../lib/backup";
+import { loadFileText, openBackupDialog, saveBackup } from "../lib/backup";
 import { engine } from "../lib/engine";
 import { connectHID } from "../lib/hid";
 import { forgetSavedKeymap, hasSavedKeymap } from "../lib/kb";
+import { isTauri } from "../lib/platform";
 import { ui } from "../lib/store";
 
 export function Header() {
@@ -27,22 +28,6 @@ export function Header() {
         </button>
         <button
           type="button"
-          id="btnSave"
-          title="キーマップ・練習記録・設定をファイルに保存"
-          onClick={() => downloadBackup()}
-        >
-          💾 保存
-        </button>
-        <button
-          type="button"
-          id="btnRestore"
-          title="保存したキーマップ・練習記録・設定をファイルから復元"
-          onClick={() => backupRef.current?.click()}
-        >
-          📂 復元
-        </button>
-        <button
-          type="button"
           id="btnForget"
           title="保存したレイアウト・キーマップを消して未読込に戻す"
           hidden={!hasSavedKeymap()}
@@ -52,6 +37,22 @@ export function Header() {
           }}
         >
           🗑 キーマップを消す
+        </button>
+        <button
+          type="button"
+          id="btnSave"
+          title="キーマップ・練習記録・設定をファイルに保存"
+          onClick={() => void saveBackup()}
+        >
+          💾 保存
+        </button>
+        <button
+          type="button"
+          id="btnRestore"
+          title="保存したキーマップ・練習記録・設定をファイルから復元"
+          onClick={() => (isTauri() ? void openBackupDialog() : backupRef.current?.click())}
+        >
+          📂 復元
         </button>
       </div>
       <input

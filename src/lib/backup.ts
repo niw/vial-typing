@@ -2,6 +2,7 @@
 // localStorageはオリジンごとに分離される（web版とTauri版・別ブラウザで非共有）ため、
 // 端末やブラウザをまたいで状態を移すバックアップ手段として使う
 import { engine } from "./engine";
+import { openTextFileTauri, saveTextFile } from "./fileDialog";
 import { guided, guidedImport, guidedRefreshJpCourse, guidedResultsSnapshot } from "./guided";
 import { loadVilText } from "./hid";
 import { charCache, importKeymap, KB, keymapSnapshot } from "./kb";
@@ -67,18 +68,10 @@ function backupFileName(): string {
   return [BACKUP_APP, name, date].filter(Boolean).join("-") + ".json";
 }
 
-// 現在の状態をファイルとしてダウンロードさせる
-export function downloadBackup() {
-  const blob = new Blob([exportBackup()], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = backupFileName();
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  setStatus("ok", "✓ 現在の状態をファイルに保存しました");
+// 現在の状態をファイルに保存する（ブラウザはダウンロード、TauriはOS保存ダイアログ）
+export async function saveBackup(): Promise<void> {
+  const saved = await saveTextFile(backupFileName(), exportBackup());
+  if (saved) setStatus("ok", "✓ 現在の状態をファイルに保存しました");
 }
 
 // バックアップファイルの内容を取り込む（復元は現在のキーマップと練習記録を置き換える）
@@ -128,4 +121,10 @@ export function importBackup(text: string): boolean {
 export function loadFileText(text: string, name: string) {
   if (parseBackup(text)) importBackup(text);
   else loadVilText(text, name);
+}
+
+// Tauri: OSの開くダイアログでファイルを選んで復元する（ブラウザは<input type=file>を使う）
+export async function openBackupDialog(): Promise<void> {
+  const file = await openTextFileTauri();
+  if (file) loadFileText(file.text, file.name);
 }

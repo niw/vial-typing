@@ -109,15 +109,30 @@ fn hid_close(state: State<HidManager>, handle: u32) -> Result<(), String> {
     Ok(())
 }
 
+// OSの保存/開くダイアログ(plugin-dialog)で選んだパスの読み書き。
+// WebのBlobダウンロード/<input>はWKWebViewで使えないため、フロントはTauri時ここへ委譲する
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(&path, contents).map_err(|e| e.to_string())
+}
+
 // macOS デスクトップ専用（iOS/Android は対象外）
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(HidManager::new().expect("HID APIの初期化に失敗"))
         .invoke_handler(tauri::generate_handler![
             hid_list,
             hid_open,
             hid_command,
-            hid_close
+            hid_close,
+            read_text_file,
+            write_text_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
