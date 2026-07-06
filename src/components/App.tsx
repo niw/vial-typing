@@ -1,6 +1,6 @@
 import { useEffect } from "react";
+import { loadFileText } from "../lib/backup";
 import { engine } from "../lib/engine";
-import { loadVilText } from "../lib/hid";
 import { currentExpected } from "../lib/hint";
 import { KB } from "../lib/kb";
 import { isUnlimited } from "../lib/settings";
@@ -88,7 +88,7 @@ export function App() {
       ui.dropVisible = false;
       invalidate();
       const f = e.dataTransfer?.files[0];
-      if (f) f.text().then((t) => loadVilText(t, f.name));
+      if (f) f.text().then((t) => loadFileText(t, f.name));
     };
 
     document.addEventListener("keydown", onKeyDown);
@@ -122,7 +122,7 @@ export function App() {
         </div>
       </div>
       <div id="drop" className={ui.dropVisible ? "show" : ""}>
-        .vil / vial.json をドロップして読み込み
+        .vil / vial.json / バックアップ をドロップして読み込み
       </div>
       <ResultDialog />
       <DevicePicker />

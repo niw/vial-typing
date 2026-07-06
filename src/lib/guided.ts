@@ -380,6 +380,27 @@ export function guidedLearningRate(key: GuidedKey): number | null {
   return d ? (n * sxy - sx * sy) / d : null;
 }
 
+// 練習記録（走行履歴）をファイル保存用に取り出す
+export function guidedResultsSnapshot(): GuidedResult[] {
+  return guided.results;
+}
+
+// ファイルから読み込んだ走行履歴を取り込み、統計と解放状態を作り直す
+export function guidedImport(results: unknown) {
+  const valid = Array.isArray(results)
+    ? results.filter(
+        (r): r is GuidedResult => !!r && typeof r === "object" && typeof (r as GuidedResult).h === "object",
+      )
+    : [];
+  guided.results = valid.slice(-GUIDED_MAX_RESULTS);
+  guided.selected = null;
+  guidedSave();
+  guidedRebuildStats();
+  guidedUpdateKeys();
+  guided.rev++;
+  invalidate();
+}
+
 // 履歴を消して未習得の状態に戻す
 export function guidedReset() {
   guided.results = [];

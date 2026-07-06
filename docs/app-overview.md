@@ -32,6 +32,7 @@ flowchart TD
 | モジュール | 役割 |
 |---|---|
 | `store.ts` | 再描画通知（`invalidate`/`subscribe`）と共通UI状態 `ui`（ステータスピル・読み取りログ・ドロップ表示） |
+| `backup.ts` | 現在の状態（キーマップ＋練習記録）を1つのJSONファイルへ書き出し／読み戻し。端末・ブラウザ間の移行用（詳細は後述） |
 | `settings.ts` | ユーザー設定 `settings`（配列解釈・入力案内・ローマ字スタイル・効果音・プレイ時間）と localStorage 復元 |
 | `data.ts` | 出題コーパス（英単語・英文・日本語単語・日本語文・記号行）の import |
 | `layout.ts` | KLE データの型と `parseKLE()`（物理キー配列への変換） |
@@ -104,6 +105,24 @@ stateDiagram-v2
   `finish()`（スコア集計と `result` 設定。キー習得モードは打鍵記録の確定）／`idle()`。
 - コンボボーナス: 30 連続正解ごとに +1 秒（無制限モードでは付与しない）。
 - `runSeconds`: 30/60/90 秒、0 は無制限（Esc で終了して結果表示）。
+
+### 状態のバックアップ（backup.ts）
+
+localStorage はオリジンごとに分離される（web版とTauri版・別ブラウザで非共有）ため、
+現在の状態を1つのJSONファイルに書き出して他環境へ移せるようにしている。
+
+- 対象: **キーマップ**（`kb.ts` の `keymapSnapshot()` = localStorage `vialTypingKeymap` と同じ形）・
+  **練習記録**（`guided.ts` の走行履歴）・**設定**（`settings.ts` の `cornix*` 一式）。
+  設定は先に反映してから（レイヤー固定をキーマップ適用時のレイヤー数チェックに乗せるため）
+  キーマップ・練習記録を取り込み、最後に `engine.idle()` で走行を仕切り直す。
+- ファイル形式: `{ app:"vial-typing", kind:"backup", version, exportedAt, keymap, guided, settings }`。
+  **トップレベル `version` が形式のバージョン**で、書き出し時に必ず付与する。読み込み時は `migrateBackup()` が
+  `version` を見て現行版へ移行し、自分より新しい `version` のバックアップは復元しない（古い版で壊れた復元をしないため）。
+- 復元は現在のキーマップと練習記録を**置き換える**。既存の練習記録が消える場合のみ確認ダイアログを出す。
+  取り込んだキーマップは localStorage にも保存され、次回起動時も自動復元される。
+- 入口: `Header` の「💾 保存」「📂 復元」ボタン、および `.vil`/vial.json と同じドラッグ＆ドロップ。
+  ドロップ／ファイル選択は `loadFileText()` が中身を見て、バックアップなら `importBackup()`、
+  それ以外は `.vil`/vial.json として `loadVilText()` へ振り分ける。
 
 ## src/components/ — React コンポーネント
 

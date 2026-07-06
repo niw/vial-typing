@@ -64,23 +64,56 @@ function saveKeymap(layers: KeyDef[][][], source: string, label?: string) {
   }
 }
 
+// 保存済み/ファイル由来のキーマップオブジェクトを現在のキーボードへ適用する。
+// restored=true は起動時の自動復元（保存し直さない）、false はファイル取り込み（保存して次回も復元する）
+function applyKeymapData(data: unknown, restored: boolean): boolean {
+  const d = data as {
+    layers?: KeyDef[][][];
+    physKeys?: PhysKey[];
+    matrixRows?: number;
+    matrixCols?: number;
+    kbName?: string;
+    source?: string;
+    label?: string;
+  } | null;
+  if (!d || !Array.isArray(d.layers) || !d.layers.length || !Array.isArray(d.physKeys) || !d.physKeys.length)
+    return false;
+  KB.rows = d.matrixRows || KB.rows;
+  KB.cols = d.matrixCols || KB.cols;
+  KB.physKeys = d.physKeys;
+  KB.name = d.kbName || d.label || "Keyboard";
+  setKeymap(d.layers, d.source || "vil", d.label || "保存済みキーマップ", restored);
+  return true;
+}
+
 // 保存済みレイアウト＋キーマップを復元（成功時true）
 export function restoreSavedKeymap() {
   try {
     const raw = localStorage.getItem(KEYMAP_STORE_KEY);
-    if (!raw) return false;
-    const d = JSON.parse(raw);
-    if (!d || !Array.isArray(d.layers) || !d.layers.length || !Array.isArray(d.physKeys) || !d.physKeys.length)
-      return false;
-    KB.rows = d.matrixRows || KB.rows;
-    KB.cols = d.matrixCols || KB.cols;
-    KB.physKeys = d.physKeys;
-    KB.name = d.kbName || d.label || "Keyboard";
-    setKeymap(d.layers, d.source || "vil", d.label || "保存済みキーマップ", true);
-    return true;
+    return raw ? applyKeymapData(JSON.parse(raw), true) : false;
   } catch {
     return false;
   }
+}
+
+// ファイルから読み込んだキーマップを適用する（localStorageにも保存して次回起動時も復元される）
+export function importKeymap(data: unknown): boolean {
+  return applyKeymapData(data, false);
+}
+
+// 現在のキーマップをファイル保存用にシリアライズ（既定/サンプル表示中はnull）
+export function keymapSnapshot() {
+  if (!hasSavedKeymap()) return null;
+  return {
+    v: 1,
+    source: KB.source,
+    label: KB.label,
+    matrixRows: KB.rows,
+    matrixCols: KB.cols,
+    physKeys: KB.physKeys,
+    kbName: KB.name,
+    layers: KB.layers,
+  };
 }
 
 // 保存済みを破棄して既定のUS配列キーボードに戻す

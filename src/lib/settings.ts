@@ -35,3 +35,63 @@ export function saveSetting(key: string, value: string) {
     localStorage.setItem(key, value);
   } catch {}
 }
+
+export interface SettingsSnapshot {
+  outMode: "us" | "jis";
+  keyPref: "auto" | "shift" | "layer";
+  layerPref: { num: string; sym: string };
+  romajiStyle: RomajiStyle;
+  soundOn: boolean;
+  runSeconds: number;
+}
+
+// 現在の設定をファイル保存用に取り出す
+export function settingsSnapshot(): SettingsSnapshot {
+  return {
+    outMode: settings.outMode,
+    keyPref: settings.keyPref,
+    layerPref: { ...settings.layerPref },
+    romajiStyle: settings.romajiStyle,
+    soundOn: settings.soundOn,
+    runSeconds: settings.runSeconds,
+  };
+}
+
+// 取り込んだ設定を反映して localStorage にも保存する。値ごとに妥当性を検証し、
+// 未知/不正なフィールドは無視して既存値を保つ。再計算などの副作用は呼び出し側が行う
+export function settingsImport(source: unknown) {
+  if (!source || typeof source !== "object") return;
+  const s = source as Partial<SettingsSnapshot>;
+  if (s.outMode === "us" || s.outMode === "jis") {
+    settings.outMode = s.outMode;
+    saveSetting("cornixOutMode", s.outMode);
+  }
+  if (s.keyPref === "auto" || s.keyPref === "shift" || s.keyPref === "layer") {
+    settings.keyPref = s.keyPref;
+    saveSetting("cornixPref", s.keyPref);
+  }
+  if (s.layerPref && typeof s.layerPref === "object") {
+    for (const [key, store] of [
+      ["num", "cornixNumLayer"],
+      ["sym", "cornixSymLayer"],
+    ] as const) {
+      const value = s.layerPref[key];
+      if (value === "auto" || (typeof value === "string" && value !== "" && !Number.isNaN(+value))) {
+        settings.layerPref[key] = value;
+        saveSetting(store, value);
+      }
+    }
+  }
+  if (s.romajiStyle === "hepburn" || s.romajiStyle === "kunrei") {
+    settings.romajiStyle = s.romajiStyle;
+    saveSetting("cornixRomaji", s.romajiStyle);
+  }
+  if (typeof s.soundOn === "boolean") {
+    settings.soundOn = s.soundOn;
+    saveSetting("cornixSound", s.soundOn ? "1" : "0");
+  }
+  if (typeof s.runSeconds === "number" && [0, 30, 60, 90].includes(s.runSeconds)) {
+    settings.runSeconds = s.runSeconds;
+    saveSetting("cornixTime", String(s.runSeconds));
+  }
+}

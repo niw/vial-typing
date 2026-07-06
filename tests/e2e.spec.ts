@@ -1,5 +1,17 @@
 import { expect, test } from "@playwright/test";
 
+// ブラウザ内でファイルをドロップして読み込ませる（アプリのグローバルdropハンドラを経由）
+async function dropFile(page: import("@playwright/test").Page, text: string, name: string) {
+  await page.evaluate(
+    ({ text, name }) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([text], name, { type: "application/json" }));
+      window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    },
+    { text, name },
+  );
+}
+
 // テスト用の最小QWERTYキーマップ（保存済みキーマップとして復元させる）
 function fakeKeymap() {
   const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
@@ -25,6 +37,84 @@ function fakeKeymap() {
     layers: [grid],
   };
 }
+
+test("キーマップと練習記録と設定をファイルへ保存し、別状態から復元できる", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate((keymap) => {
+    localStorage.setItem("vialTypingKeymap", JSON.stringify(keymap));
+    const histogram: Record<string, [number, number, number]> = {};
+    for (const ch of "abcdef") histogram[ch] = [10, 0, 200];
+    localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
+  }, fakeKeymap());
+  await page.reload();
+  await expect(page.locator("#status")).toHaveClass(/ok/);
+
+  // 復元で戻す設定を、既定と異なる値にしておく
+  await page.getByRole("button", { name: "30秒" }).click();
+  await page.selectOption("#selRomaji", "kunrei");
+
+  // 保存: 書き出されるBlobの中身を捕まえ、バージョンとキーマップ・練習記録が入っていることを確認する
+  await page.evaluate(() => {
+    const orig = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = (blob: Blob) => {
+      blob.text().then((t) => ((window as unknown as { __backup?: string }).__backup = t));
+      return orig(blob);
+    };
+  });
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "保存" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^vial-typing.*\.json$/);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __backup?: string }).__backup ?? null))
+    .not.toBeNull();
+  const backupText = await page.evaluate(() => (window as unknown as { __backup: string }).__backup);
+  const backup = JSON.parse(backupText);
+  expect(backup.app).toBe("vial-typing");
+  expect(backup.version).toBe(1);
+  expect(backup.keymap.label).toBe("Test QWERTY");
+  expect(backup.guided.results).toHaveLength(1);
+  expect(backup.settings.runSeconds).toBe(30);
+  expect(backup.settings.romajiStyle).toBe("kunrei");
+
+  // 既定状態に戻してからファイルで復元する
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.locator("#status")).toContainText("既定のUS配列キーボード");
+  await expect(page.getByRole("button", { name: "30秒" })).not.toHaveClass(/active/); // 設定も既定に戻っている
+  await expect(page.locator("#selRomaji")).toHaveValue("hepburn");
+  await dropFile(page, backupText, "backup.json");
+  await expect(page.locator("#status")).toContainText("復元");
+  await expect(page.locator("#status")).toHaveClass(/ok/);
+
+  // 設定もUIに反映される
+  await expect(page.getByRole("button", { name: "30秒" })).toHaveClass(/active/);
+  await expect(page.locator("#selRomaji")).toHaveValue("kunrei");
+
+  // 復元した状態はlocalStorageにも保存され、リロード後も残る
+  await page.reload();
+  const stored = await page.evaluate(() => ({
+    keymap: JSON.parse(localStorage.getItem("vialTypingKeymap") ?? "null"),
+    guided: JSON.parse(localStorage.getItem("vialTypingGuided") ?? "null"),
+    time: localStorage.getItem("cornixTime"),
+    romaji: localStorage.getItem("cornixRomaji"),
+  }));
+  expect(stored.keymap.label).toBe("Test QWERTY");
+  expect(stored.guided.results).toHaveLength(1);
+  expect(stored.time).toBe("30");
+  expect(stored.romaji).toBe("kunrei");
+});
+
+test("新しいバージョンのバックアップは復元しない", async ({ page }) => {
+  await page.goto("/");
+  await dropFile(
+    page,
+    JSON.stringify({ app: "vial-typing", kind: "backup", version: 999, keymap: null, guided: null }),
+    "future.json",
+  );
+  await expect(page.locator("#status")).toContainText("新しいバージョン");
+  await expect(page.locator("#status")).toHaveClass(/err/);
+});
 
 test("練習データを読み込みスタート画面を表示する", async ({ page }) => {
   const errors: string[] = [];
