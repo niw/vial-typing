@@ -13,27 +13,29 @@ export function Header() {
         Vial <span>Typing</span>
       </h1>
       <div className="sub">Vial対応キーボードのレイアウトとキーマップを読み取って練習</div>
-      <div id="status" className={ui.status.cls}>
-        {ui.status.text}
+      <div className="actions">
+        <div id="status" className={ui.status.cls}>
+          {ui.status.text}
+        </div>
+        <button type="button" id="btnConnect" className="primary" onClick={() => void connectHID()}>
+          🔌 キーボードから読み取る
+        </button>
+        <button type="button" id="btnVil" onClick={() => fileRef.current?.click()}>
+          📄 .vilを開く
+        </button>
+        <button
+          type="button"
+          id="btnForget"
+          title="保存したレイアウト・キーマップを消して未読込に戻す"
+          hidden={!hasSavedKeymap()}
+          onClick={() => {
+            forgetSavedKeymap();
+            engine.idle();
+          }}
+        >
+          🗑 キーマップを消す
+        </button>
       </div>
-      <button type="button" id="btnConnect" className="primary" onClick={() => void connectHID()}>
-        🔌 キーボードから読み取る
-      </button>
-      <button type="button" id="btnVil" onClick={() => fileRef.current?.click()}>
-        📄 .vilを開く
-      </button>
-      <button
-        type="button"
-        id="btnForget"
-        title="保存したレイアウト・キーマップを消して未読込に戻す"
-        hidden={!hasSavedKeymap()}
-        onClick={() => {
-          forgetSavedKeymap();
-          engine.idle();
-        }}
-      >
-        🗑 キーマップを消す
-      </button>
       <input
         type="file"
         id="vilFile"
