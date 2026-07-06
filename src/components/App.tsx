@@ -17,14 +17,16 @@ import { useAppState } from "./useApp";
 export function App() {
   useAppState();
 
-  // 案内対象キーのレイヤーへ表示を自動で切り替える（旧refreshHintの副作用）
-  const hintLayer = currentExpected().hint?.layer;
+  // 案内対象キーのレイヤーへ表示を自動で切り替える（旧refreshHintの副作用）。
+  // 打鍵ごとに再評価し、レイヤータブの手動切替では発火させない
+  const { hint } = currentExpected();
+  const strokes = engine.correct + engine.miss;
   useEffect(() => {
-    if (hintLayer != null && hintLayer !== KB.viewLayer) {
-      KB.viewLayer = hintLayer;
+    if (hint && hint.layer !== KB.viewLayer) {
+      KB.viewLayer = hint.layer;
       invalidate();
     }
-  });
+  }, [hint, strokes]);
 
   // グローバル入力: キー入力・ファイルドロップ
   useEffect(() => {

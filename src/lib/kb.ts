@@ -96,13 +96,10 @@ export function forgetSavedKeymap() {
   invalidate();
 }
 
-// 「キーマップを消す」ボタンは保存済みキーマップがあるときだけ表示
+// 「キーマップを消す」ボタンは保存済みキーマップがあるときだけ表示。
+// 毎描画でlocalStorageを読まないよう、読込元がsample以外(=読込時に保存済み)かで判定する
 export function hasSavedKeymap() {
-  try {
-    return !!localStorage.getItem(KEYMAP_STORE_KEY);
-  } catch {
-    return false;
-  }
+  return KB.source !== "sample";
 }
 
 // findKeyForChar の結果: 押すキーとホールドすべきキー

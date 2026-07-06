@@ -17,6 +17,14 @@ export function TypePanel() {
   );
 }
 
+// 待機中の案内は静的なのでモジュールレベルで一度だけ生成する
+const startPrompt = (
+  <>
+    <span className="start-prompt">▶ スタート</span>
+    <span className="start-sub">クリック / Space / Enter で開始　・　プレイ中は ESC で戻る</span>
+  </>
+);
+
 function TypeLine() {
   const idle = !engine.running && !engine.counting;
   let content: React.ReactNode;
@@ -29,12 +37,7 @@ function TypeLine() {
       </span>
     );
   } else if (!engine.running) {
-    content = (
-      <>
-        <span className="start-prompt">▶ スタート</span>
-        <span className="start-sub">クリック / Space / Enter で開始　・　プレイ中は ESC で戻る</span>
-      </>
-    );
+    content = startPrompt;
   } else {
     let done: string, cur: string, rest: string;
     if (engine.isJP()) {

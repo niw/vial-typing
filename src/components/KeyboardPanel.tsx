@@ -1,9 +1,58 @@
-import { Fragment, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { currentExpected } from "../lib/hint";
 import { effKey, FINGER_NAMES, fingerFor, type Hint, KB, type KeyPos } from "../lib/kb";
 import { K_NONE, legendFor, shiftedSub } from "../lib/keycodes";
 import { settings } from "../lib/settings";
 import { invalidate, ui } from "../lib/store";
+
+// 静的なJSXは毎描画での再生成を避けるためモジュールレベルへ
+const colorLegend = (
+  <div className="legend">
+    <span>
+      <i className="lt" />
+      押すキー
+    </span>
+    <span>
+      <i className="ls" />
+      Shiftを押しながら
+    </span>
+    <span>
+      <i className="ll" />
+      レイヤーキーを押しながら
+    </span>
+  </div>
+);
+
+const usageNote = (
+  <div className="note">
+    ・<b>読み取り方法:</b> Vial対応キーボードをUSBケーブルで接続し「キーボードから読み取る」を押すと、
+    レイアウト定義とキーマップを自動で読み取ります（Chrome / Edge、WebHID対応ブラウザが必要）。
+    <br />
+    ・レイアウトの読み取りに失敗する場合は、キーボードの <code>vial.json</code> をドロップしてレイアウトを適用後、
+    <a href="https://vial.rocks" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
+      Vial
+    </a>{" "}
+    でエクスポートした <code>.vil</code> をドロップしてください。
+    <br />
+    ・日本語ローマ字モードでは IME（日本語入力）を<b>オフ</b>にしてください。ローマ字は ヘボン式/訓令式
+    どちらでも入力できます（案内に使う綴りは設定の「ローマ字」で切替）。
+  </div>
+);
+
+const placeholder = (
+  <div id="kb" style={{ width: "auto", height: "auto" }}>
+    <div className="kb-placeholder">
+      ⌨️ キーボードが未読込です
+      <br />
+      <span>
+        「🔌
+        キーボードから読み取る」を押すと、接続中のVial対応キーボードからレイアウトとキーマップを自動で読み込みます。
+        <br />
+        または vial.json（レイアウト）/ .vil（キーマップ）をこのページにドロップしてください。
+      </span>
+    </div>
+  </div>
+);
 
 export function KeyboardPanel() {
   return (
@@ -27,34 +76,9 @@ export function KeyboardPanel() {
         </div>
       </div>
       <Keyboard />
-      <div className="legend">
-        <span>
-          <i className="lt" />
-          押すキー
-        </span>
-        <span>
-          <i className="ls" />
-          Shiftを押しながら
-        </span>
-        <span>
-          <i className="ll" />
-          レイヤーキーを押しながら
-        </span>
-      </div>
+      {colorLegend}
       <DebugLog />
-      <div className="note">
-        ・<b>読み取り方法:</b> Vial対応キーボードをUSBケーブルで接続し「キーボードから読み取る」を押すと、
-        レイアウト定義とキーマップを自動で読み取ります（Chrome / Edge、WebHID対応ブラウザが必要）。
-        <br />
-        ・レイアウトの読み取りに失敗する場合は、キーボードの <code>vial.json</code> をドロップしてレイアウトを適用後、
-        <a href="https://vial.rocks" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
-          Vial
-        </a>{" "}
-        でエクスポートした <code>.vil</code> をドロップしてください。
-        <br />
-        ・日本語ローマ字モードでは IME（日本語入力）を<b>オフ</b>にしてください。ローマ字は ヘボン式/訓令式
-        どちらでも入力できます（案内に使う綴りは設定の「ローマ字」で切替）。
-      </div>
+      {usageNote}
     </section>
   );
 }
@@ -94,47 +118,33 @@ function Keyboard() {
     return () => observer.disconnect();
   }, []);
 
-  if (!KB.layerCount) {
-    return (
-      <div id="kbwrap" ref={wrapRef}>
-        <div id="kb" style={{ width: "auto", height: "auto" }}>
-          <div className="kb-placeholder">
-            ⌨️ キーボードが未読込です
-            <br />
-            <span>
-              「🔌
-              キーボードから読み取る」を押すと、接続中のVial対応キーボードからレイアウトとキーマップを自動で読み込みます。
-              <br />
-              または vial.json（レイアウト）/ .vil（キーマップ）をこのページにドロップしてください。
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  let maxX = 0,
-    maxY = 0,
-    minX = 99,
-    minY = 99;
-  for (const k of KB.physKeys) {
-    maxX = Math.max(maxX, k.x + k.w);
-    maxY = Math.max(maxY, k.y + k.h + 0.6);
-    minX = Math.min(minX, k.x);
-    minY = Math.min(minY, k.y);
-  }
-  const pad = 0.25;
-  // キーボード全体がコンテナ幅に収まるようユニット(--u)を動的計算（最大52px）
-  const spanX = maxX - minX + pad * 2 || 1;
-  const U = Math.max(14, Math.min(52, avail / spanX));
-  const gap = 3;
+  const { hint } = currentExpected();
   const jis = settings.outMode === "jis";
-  const highlights = highlightMap(currentExpected().hint);
-  const alt = currentExpected().hint?.alt ?? null;
-  const altKey = alt && alt.layer === KB.viewLayer ? alt.key.r + "," + alt.key.c : null;
+  // キー盤はタイマーtick毎の全体再描画では変わらないので、入力(hint)や
+  // キーマップ・レイヤー・幅が変わったときだけ組み立て直す
+  const board = useMemo(() => {
+    if (!KB.layerCount) return placeholder;
 
-  return (
-    <div id="kbwrap" ref={wrapRef}>
+    let maxX = 0,
+      maxY = 0,
+      minX = 99,
+      minY = 99;
+    for (const k of KB.physKeys) {
+      maxX = Math.max(maxX, k.x + k.w);
+      maxY = Math.max(maxY, k.y + k.h + 0.6);
+      minX = Math.min(minX, k.x);
+      minY = Math.min(minY, k.y);
+    }
+    const pad = 0.25;
+    // キーボード全体がコンテナ幅に収まるようユニット(--u)を動的計算（最大52px）
+    const spanX = maxX - minX + pad * 2 || 1;
+    const U = Math.max(14, Math.min(52, avail / spanX));
+    const gap = 3;
+    const highlights = highlightMap(hint);
+    const alt = hint?.alt ?? null;
+    const altKey = alt && alt.layer === KB.viewLayer ? alt.key.r + "," + alt.key.c : null;
+
+    return (
       <div
         id="kb"
         style={
@@ -191,6 +201,13 @@ function Keyboard() {
           );
         })}
       </div>
+    );
+    // KBはミュータブルだが、layers/physKeys/layerCountは差し替え時に参照ごと変わる
+  }, [hint, jis, avail, KB.physKeys, KB.layers, KB.layerCount, KB.viewLayer]);
+
+  return (
+    <div id="kbwrap" ref={wrapRef}>
+      {board}
     </div>
   );
 }

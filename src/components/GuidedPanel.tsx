@@ -22,6 +22,8 @@ const COURSES: [CourseId, string][] = [
 ];
 
 export function GuidedPanel() {
+  // 非表示中は描画も導出計算もしない（キーストローク毎の全体再描画に乗るため）
+  if (!engine.guided) return null;
   const course = guided.courses[guided.course];
   const letterFocus = guidedFocusOf(course.letters);
   const symbolFocus = course.symbols ? guidedFocusOf(course.symbols) : null;
@@ -30,7 +32,7 @@ export function GuidedPanel() {
   if (symbolFocus) parts.push("記号: " + symbolFocus);
   const selected = guidedSelectedKey();
   return (
-    <div id="guided" hidden={!engine.guided}>
+    <div id="guided">
       <div className="guided-head">
         <span className="title">🔓 タイピング履歴に応じてキーが解放され、出題単語が変わります</span>
         <div className="course-tabs">
@@ -134,15 +136,14 @@ function KeyInfo({ guidedKey: key }: { guidedKey: GuidedKey }) {
 
 function KeyChart({ guidedKey: key }: { guidedKey: GuidedKey }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const visible = engine.guided;
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !visible) return;
+    if (!canvas) return;
     drawKeyChart(canvas, key);
     // コンテナ幅の変化（サイドバー切替やリサイズ）でも再描画する
     const observer = new ResizeObserver(() => drawKeyChart(canvas, key));
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [key, visible]);
+  }, [key]);
   return <canvas id="keyChart" ref={canvasRef} />;
 }
