@@ -19,7 +19,8 @@ Vial対応キーボード全般で使えるタイピング練習サイト。
 
 ## 開発
 
-Vite + TypeScript 構成。ソースは `src/`（`main.ts` / `style.css` / `index.html` / `data/*.json`）にあります。
+Vite + React + TypeScript 構成。ソースは `src/` にあり、ロジックと状態は `src/lib/`、
+UI は `src/components/` に分かれています（全体像は `docs/app-overview.md`）。
 
 ```sh
 npm install

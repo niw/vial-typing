@@ -13,12 +13,17 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
     "@playwright/test": "^1.61.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@types/w3c-web-hid": "^1.0.7",
+    "@vitejs/plugin-react": "^6.0.3",
     "typescript": "^6.0.3",
     "vite": "^8.1.3"
   },
   "dependencies": {
     "lzma": "^2.3.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "xz-decompress": "^0.2.3"
   }
 }

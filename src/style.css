@@ -20,6 +20,10 @@
   margin: 0;
   padding: 0;
 }
+/* Reactのマウント先。bodyのflexレイアウトに子要素を直接参加させる */
+#root {
+  display: contents;
+}
 body {
   background:
     radial-gradient(circle at 8% 12%, rgba(255, 93, 143, 0.1), transparent 30%),
