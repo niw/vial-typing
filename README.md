@@ -1,5 +1,9 @@
 # Vial Typing
 
+[![Deploy GitHub Pages](https://github.com/niw/vial-typing/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/niw/vial-typing/actions/workflows/deploy-pages.yml)
+
+**[アプリをブラウザで開く](https://niw.github.io/vial-typing/)**
+
 Vial対応キーボード全般で使えるタイピング練習ソフト。
 
 接続したキーボードから**レイアウト定義とキーマップを直接読み取り**、次に押すべきキー（レイヤーキー・Shiftの押し順を含む）をキーボード図上にインジケータ表示します。[Cornix](https://en.zfrontier.com/products/in-stock-cornix-tented-low-profile-split-ergo-keyboard-by-jezail-funder)（Jezail Funder）向けに開発し、汎用化したものです。
