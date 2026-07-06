@@ -54,10 +54,12 @@ test("選択したプレイ時間はリロード後も保持される", async ({
   await expect(page.locator("#stTime")).toHaveText("30.0");
 });
 
-test("キーボード未読込で開始すると案内を表示する", async ({ page }) => {
+test("キーボード未読込でも既定のUS配列キーボードで開始できる", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator("#status")).toContainText("既定のUS配列キーボード");
+  await expect(page.locator("#btnForget")).toBeHidden();
   await page.locator("#typeline").click();
-  await expect(page.locator("#typeline")).toContainText("先にキーボードを読み込んでください");
+  await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 });
 });
 
 test("ローマ字スタイルはヘボン式が既定でリロード後も保持される", async ({ page }) => {

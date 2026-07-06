@@ -1,5 +1,7 @@
 // アプリ全体の再描画通知。状態はモジュール別の可変オブジェクトに持ち、
 // 変更後に invalidate() を呼ぶと購読中のReactコンポーネントが再描画される
+import { DEFAULT_STATUS_TEXT } from "./defaultKeyboard";
+
 type Listener = () => void;
 
 const listeners = new Set<Listener>();
@@ -23,7 +25,7 @@ export function getVersion() {
 
 // 画面共通のUI状態（ステータスピル・読み取りログ・ドロップ表示）
 export const ui = {
-  status: { cls: "", text: "キーボード未読込" },
+  status: { cls: "", text: DEFAULT_STATUS_TEXT },
   log: [] as string[],
   dropVisible: false,
 };

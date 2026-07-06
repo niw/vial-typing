@@ -1,18 +1,20 @@
 // キーマップ状態と逆引き (文字 → キー+Shift+レイヤー)、指番号の推定
+import { DEFAULT_KEYBOARD, DEFAULT_STATUS_TEXT } from "./defaultKeyboard";
 import { charsOf, K_NONE, type KeyDef, modsHaveShift, tapOf } from "./keycodes";
-import { KLE, type PhysKey, parseKLE } from "./layout";
+import type { PhysKey } from "./layout";
 import { settings } from "./settings";
 import { invalidate, setStatus } from "./store";
 
-// 現在のキーボード: 物理配置(rows/cols/physKeys/name)とキーマップ(layers)、表示中レイヤー
+// 現在のキーボード: 物理配置(rows/cols/physKeys/name)とキーマップ(layers)、表示中レイヤー。
+// 起動直後は既定のUS配列キーボード(defaultKeyboard.ts)を表示し、実機読み取り/ドロップで置き換える
 export const KB = {
-  rows: 8,
-  cols: 7,
-  physKeys: parseKLE(KLE),
-  name: "Cornix",
-  layers: [] as KeyDef[][][],
-  layerCount: 0,
-  source: "sample",
+  rows: DEFAULT_KEYBOARD.rows,
+  cols: DEFAULT_KEYBOARD.cols,
+  physKeys: DEFAULT_KEYBOARD.physKeys,
+  name: DEFAULT_KEYBOARD.name,
+  layers: DEFAULT_KEYBOARD.layers as KeyDef[][][],
+  layerCount: DEFAULT_KEYBOARD.layers.length,
+  source: "default",
   label: "",
   viewLayer: 0,
 };
@@ -81,25 +83,29 @@ export function restoreSavedKeymap() {
   }
 }
 
-// 保存済みを破棄して未読込状態に戻す
+// 保存済みを破棄して既定のUS配列キーボードに戻す
 export function forgetSavedKeymap() {
   try {
     localStorage.removeItem(KEYMAP_STORE_KEY);
   } catch {}
-  KB.layers = [];
-  KB.layerCount = 0;
-  KB.source = "sample";
+  KB.rows = DEFAULT_KEYBOARD.rows;
+  KB.cols = DEFAULT_KEYBOARD.cols;
+  KB.physKeys = DEFAULT_KEYBOARD.physKeys;
+  KB.name = DEFAULT_KEYBOARD.name;
+  KB.layers = DEFAULT_KEYBOARD.layers;
+  KB.layerCount = DEFAULT_KEYBOARD.layers.length;
+  KB.source = "default";
   KB.label = "";
   KB.viewLayer = 0;
   charCache.clear();
-  setStatus("", "キーボード未読込");
+  setStatus("", DEFAULT_STATUS_TEXT);
   invalidate();
 }
 
 // 「キーマップを消す」ボタンは保存済みキーマップがあるときだけ表示。
-// 毎描画でlocalStorageを読まないよう、読込元がsample以外(=読込時に保存済み)かで判定する
+// 毎描画でlocalStorageを読まないよう、読込元がsample/default以外(=読込時に保存済み)かで判定する
 export function hasSavedKeymap() {
-  return KB.source !== "sample";
+  return KB.source !== "sample" && KB.source !== "default";
 }
 
 // findKeyForChar の結果: 押すキーとホールドすべきキー
@@ -165,8 +171,11 @@ function buildFingerMap() {
   const midX = (Math.min(...entries.map((e) => e.cx)) + Math.max(...entries.map((e) => e.cx))) / 2;
   const splitHalves = KB.rows >= 6 && KB.rows % 2 === 0;
   const thumbRows = splitHalves ? [KB.rows / 2 - 1, KB.rows - 1] : [];
+  // 非分割盤: 回転キー、または最下段の幅広キー(スペース等)だけを親指とする。
+  // 最下段以外の幅広キー(Shift/Enter/Backspace等)は親指ではない
+  const maxRow = Math.max(...entries.map((e) => e.k.row));
   const isThumb = (e: { k: PhysKey; cx: number }) =>
-    splitHalves ? thumbRows.includes(e.k.row) : e.k.r !== 0 || e.k.w >= 1.75;
+    splitHalves ? thumbRows.includes(e.k.row) : e.k.r !== 0 || (e.k.row === maxRow && e.k.w >= 1.75);
   for (const hand of ["L", "R"]) {
     const handKeys = entries.filter((e) => (hand === "L" ? e.cx <= midX : e.cx > midX));
     const fingerKeys: { k: PhysKey; cx: number }[] = [];
