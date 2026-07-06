@@ -104,6 +104,7 @@ stateDiagram-v2
 
 | コンポーネント | 描画対象 |
 |---|---|
+| `useApp.ts` | `invalidate()` を購読するフック（`useSyncExternalStore`。App が購読しツリー全体を再描画） |
 | `App.tsx` | 全体レイアウト、グローバル keydown・ドラッグ&ドロップ、表示レイヤー自動切替 |
 | `Header.tsx` | タイトル・ステータスピル・読み取り/開く/消すボタン |
 | `Toolbar.tsx` | モード切替・練習モード・プレイ時間・設定セレクト群 |
@@ -116,6 +117,12 @@ stateDiagram-v2
 
 再描画はキーストロークと 100ms のタイマー毎に全体で走るが、UI が小さいので問題にならない。
 canvas グラフだけは選択キーのオブジェクト同一性を effect の依存にして、統計が変わったときのみ再描画する。
+
+## 起動処理（src/main.tsx）
+
+キー習得モードの履歴読込（`guidedLoad` → `guidedRebuildStats` → `guidedUpdateKeys`）→
+保存済みキーマップの復元（`restoreSavedKeymap`。無ければプレースホルダ表示のまま）→
+`createRoot` で `<App />` をマウント。以降の画面更新はすべて `invalidate()` 経由。
 
 ## localStorage キー一覧
 
