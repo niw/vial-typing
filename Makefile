@@ -4,4 +4,8 @@ PORT ?= 3000
 
 .PHONY: run
 run:
-	python3 -m http.server $(PORT)
+	npm run dev -- --port $(PORT)
+
+.PHONY: build
+build:
+	npm run build

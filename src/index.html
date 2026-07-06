@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="jjM0-yhpH3z17_a3F6Dc4mmCanebiDxJ3noOOb3zsXQ">
     <title>Vial Typing — キーマップ連動タイピング練習</title>
-    <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <header>
@@ -156,7 +155,7 @@
             ・<b>読み取り方法:</b>
             Vial対応キーボードをUSBケーブルで接続し「キーボードから読み取る」を押すと、レイアウト定義とキーマップを自動で読み取ります（Chrome
             / Edge、WebHID対応ブラウザが必要）。<br>
-            ・レイアウトの展開（xz/lzma）にはCDNのデコーダを使います。オフライン等で失敗する場合は、キーボードの
+            ・レイアウトの読み取りに失敗する場合は、キーボードの
             <code>vial.json</code>
             をドロップしてレイアウトを適用後、<a href="https://vial.rocks" target="_blank" style="color:var(--accent)"
               >Vial</a
@@ -192,6 +191,6 @@
       <div style="text-align:center; font-size:12px; color:var(--dim); margin-top:12px;">ESCキーでメニューに戻る</div>
     </dialog>
 
-    <script type="module" src="app.js"></script>
+    <script type="module" src="./main.ts"></script>
   </body>
 </html>

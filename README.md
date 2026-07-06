@@ -15,7 +15,19 @@ Vial対応キーボード全般で使えるタイピング練習サイト。
 
 ## 使い方
 
-ブラウザ（Chrome / Edge 推奨。WebHIDが必要）で開き、「キーボードから読み取る」を押すだけ。`make run` でローカルhttpサーバーが立ちます。
+ブラウザ（Chrome / Edge 推奨。WebHIDが必要）で開き、「キーボードから読み取る」を押すだけ。
+
+## 開発
+
+Vite + TypeScript 構成。ソースは `src/`（`main.ts` / `style.css` / `index.html` / `data/*.json`）にあります。
+
+```sh
+npm install
+npm run dev     # 開発サーバー（make run でも可）
+npm run build   # 型チェック + dist/ へビルド
+npm run test    # Playwrightテスト（ビルドして実行）
+npm run lint    # Biome
+```
 
 ## License
 

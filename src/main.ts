@@ -1,3 +1,10 @@
+import "./style.css";
+import EN_SENTS from "./data/en_sents.json";
+import EN_WORDS from "./data/en_words.json";
+import JP_SENTS_DATA from "./data/jp_sents.json";
+import JP_WORDS_DATA from "./data/jp_words.json";
+import SYM_ITEMS from "./data/sym_items.json";
+
 /* ================================================================
    Cornix Typing — keymap-aware typing trainer for the Cornix
    (Jezail Funder) split keyboard.
@@ -9,6 +16,68 @@
      5. WebHID (Vial/VIA protocol) reader + .vil import
      6. Practice engine (EN / JP romaji / symbols / guided key unlocking)
    ================================================================ */
+
+/* ---------- 0. 共有型 ---------- */
+
+// 物理キー1個分の配置（KLE由来。x/y/w/hはキーユニット単位、rは回転角）
+interface PhysKey {
+  row: number;
+  col: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  r: number;
+  rx: number;
+  ry: number;
+}
+
+// デコード済みキーコード。tで種別を表し、必要なフィールドだけ持つ
+interface KeyDef {
+  t: string;
+  code?: number;
+  mods?: number;
+  layer?: number;
+  tap?: number;
+  label?: string;
+}
+
+// KLEの1要素: メタオブジェクトか "row,col" ラベル文字列
+type KleItem = { [k: string]: number | boolean | undefined } | string;
+
+// vial.json形式のレイアウト定義
+interface VialDefinition {
+  name?: string;
+  matrix?: { rows: number; cols: number };
+  layouts?: { keymap?: KleItem[][] };
+}
+
+// findKeyForChar の結果: 押すキーとホールドすべきキー
+interface KeyPos {
+  r: number;
+  c: number;
+}
+interface ShiftKeyPos extends KeyPos {
+  plain: boolean;
+  fromBase?: boolean;
+}
+interface LayerKeyPos extends KeyPos {
+  mods: number;
+}
+interface Hint {
+  key: KeyPos;
+  layer: number;
+  shiftKey: ShiftKeyPos | null;
+  layerKey: LayerKeyPos | null;
+  score: number;
+  alt?: Hint | null;
+}
+
+declare global {
+  interface Window {
+    lastDefJson?: string;
+  }
+}
 
 /* ---------- 1. Physical layout ---------- */
 let MATRIX_ROWS = 8,
@@ -40,29 +109,29 @@ const KLE = [
 ];
 
 // Parse KLE -> array of physical keys {row,col,x,y,w,h,r,rx,ry}
-function parseKLE(kle) {
-  const keys = [];
-  const c = { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, clusterX: 0, clusterY: 0 };
+function parseKLE(kle: KleItem[][]): PhysKey[] {
+  const keys: PhysKey[] = [];
+  const c = { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, clusterX: 0, clusterY: 0, decal: false };
   for (const row of kle) {
     if (!Array.isArray(row)) continue; // KLE metadata entry
     for (const item of row) {
       if (typeof item === "object") {
         if (item.d) c.decal = true;
-        if (item.r !== undefined) c.r = item.r;
-        if (item.rx !== undefined) {
+        if (typeof item.r === "number") c.r = item.r;
+        if (typeof item.rx === "number") {
           c.clusterX = c.rx = item.rx;
           c.x = c.clusterX;
           c.y = c.clusterY;
         }
-        if (item.ry !== undefined) {
+        if (typeof item.ry === "number") {
           c.clusterY = c.ry = item.ry;
           c.x = c.clusterX;
           c.y = c.clusterY;
         }
-        c.x += item.x || 0;
-        c.y += item.y || 0;
-        if (item.w) c.w = item.w;
-        if (item.h) c.h = item.h;
+        c.x += (item.x as number) || 0;
+        c.y += (item.y as number) || 0;
+        if (typeof item.w === "number") c.w = item.w;
+        if (typeof item.h === "number") c.h = item.h;
       } else {
         const parts = item.split("\n");
         const isEncoder = parts[9] === "e"; // Vial: 10th legend "e" = encoder
@@ -96,7 +165,7 @@ let PHYS_KEYS = parseKLE(KLE);
 const KBDEF = { name: "Cornix" };
 
 // apply a vial.json-style definition: {name, matrix:{rows,cols}, layouts:{keymap:[KLE]}}
-function applyDefinition(def, label) {
+function applyDefinition(def: VialDefinition, label?: string) {
   if (!def?.matrix || !def.layouts || !Array.isArray(def.layouts.keymap))
     throw new Error("vial.json形式ではありません");
   const keys = parseKLE(def.layouts.keymap);
@@ -112,58 +181,27 @@ function applyDefinition(def, label) {
   setKeymap(empty, "sample");
 }
 
-function loadScript(src) {
-  return new Promise((res, rej) => {
-    const s = document.createElement("script");
-    s.src = src;
-    s.onload = res;
-    s.onerror = () => rej(new Error("CDNからのデコーダ読み込みに失敗"));
-    document.head.appendChild(s);
-  });
-}
-
-// vial definitions are xz-compressed JSON (RMK & vial-qmk both use the XZ container)
-let xzModule = null;
-async function getXz() {
-  if (xzModule) return xzModule;
-  // the CDN build is CommonJS, so fetch the source and evaluate it with a tiny shim
-  const resp = await fetch("https://cdn.jsdelivr.net/npm/xz-decompress@0.2.3/dist/package/xz-decompress.min.js");
-  if (!resp.ok) throw new Error("xzデコーダのダウンロードに失敗 (" + resp.status + ")");
-  const code = await resp.text();
-  const mod = { exports: {} };
-  // UMD bundle takes the CJS branch and calls require("stream/web") -> hand it the browser globals
-  const requireStub = () => ({
-    ReadableStream: window.ReadableStream,
-    WritableStream: window.WritableStream,
-    TransformStream: window.TransformStream,
-    CountQueuingStrategy: window.CountQueuingStrategy,
-    ByteLengthQueuingStrategy: window.ByteLengthQueuingStrategy,
-  });
-  new Function("module", "exports", "require", code)(mod, mod.exports, requireStub);
-  if (!mod.exports.XzReadableStream) throw new Error("xzデコーダの初期化に失敗");
-  xzModule = mod.exports;
-  return xzModule;
-}
-async function decompressDefinition(buf) {
+// vial definitions are xz-compressed JSON (RMK & vial-qmk both use the XZ container).
+// デコーダはバンドル済みで、必要になったときだけ動的importで読み込む
+async function decompressDefinition(buf: Uint8Array): Promise<string> {
   if (buf[0] === 0xfd && buf[1] === 0x37 && buf[2] === 0x7a) {
     // .xz magic
-    const { XzReadableStream } = await getXz();
-    return await new Response(new XzReadableStream(new Blob([buf]).stream())).text();
+    const { XzReadableStream } = await import("xz-decompress");
+    return await new Response(new XzReadableStream(new Blob([buf as BlobPart]).stream())).text();
   }
-  await loadScript("https://cdn.jsdelivr.net/npm/lzma@2.3.2/src/lzma_worker.js"); // LZMA_ALONE fallback
-  const L = window.LZMA_WORKER || window.LZMA;
-  if (!L) throw new Error("lzmaデコーダの読み込みに失敗");
-  return new Promise((res, rej) =>
-    L.decompress(Array.from(buf), (r, e) =>
-      e ? rej(new Error(String(e))) : res(typeof r === "string" ? r : new TextDecoder().decode(new Uint8Array(r))),
-    ),
-  );
+  const { LZMA_WORKER } = await import("lzma/src/lzma_worker.js"); // LZMA_ALONE fallback
+  return new Promise((res, rej) => {
+    LZMA_WORKER.decompress(Array.from(buf), (r, e) => {
+      if (e) rej(new Error(String(e)));
+      else res(typeof r === "string" ? r : new TextDecoder().decode(new Uint8Array(r)));
+    });
+  });
 }
 
 /* ---------- 2. Keycode tables & decoding ---------- */
 
 // HID usage -> [unshifted char, shifted char] (US layout)
-const HID_CHARS = {};
+const HID_CHARS: Record<number, [string, string]> = {};
 (() => {
   const az = "abcdefghijklmnopqrstuvwxyz";
   for (let i = 0; i < 26; i++) HID_CHARS[0x04 + i] = [az[i], az[i].toUpperCase()];
@@ -199,7 +237,7 @@ const HID_CHARS = {};
 })();
 
 // JIS interpretation (OS set to JIS *without* firmware US-conversion)
-const HID_CHARS_JIS = {
+const HID_CHARS_JIS: Record<number, [string, string]> = {
   0x1f: ["2", '"'],
   0x23: ["6", "&"],
   0x24: ["7", "'"],
@@ -223,7 +261,7 @@ let outMode = "us";
 try {
   if (localStorage.getItem("cornixOutMode") === "jis") outMode = "jis";
 } catch {}
-function charsOf(code) {
+function charsOf(code: number): [string, string] | undefined {
   if (outMode === "jis") {
     if (code in HID_CHARS_JIS) return HID_CHARS_JIS[code];
     if (code === 0x35) return undefined; // JIS: 半角/全角 — no character output
@@ -232,7 +270,7 @@ function charsOf(code) {
 }
 
 // labels for non-character HID codes
-const KEYLABELS = {
+const KEYLABELS: Record<number, string> = {
   0x00: "",
   0x29: "Esc",
   0x2a: "⌫",
@@ -273,9 +311,9 @@ const KEYLABELS = {
 for (let i = 0; i < 12; i++) KEYLABELS[0x3a + i] = "F" + (i + 1); // F1-F12
 for (let i = 0; i < 12; i++) KEYLABELS[0x68 + i] = "F" + (i + 13); // F13-F24 (HID 0x68-0x73)
 
-const modsHaveShift = (m) => !!(m & 0x02);
-function modsLabel(m) {
-  const p = [];
+const modsHaveShift = (m: number) => !!(m & 0x02);
+function modsLabel(m: number) {
+  const p: string[] = [];
   if (m & 1) p.push("Ctrl");
   if (m & 2) p.push("Sft");
   if (m & 4) p.push("Alt");
@@ -284,7 +322,7 @@ function modsLabel(m) {
 }
 
 // KC_ name -> HID code (for .vil parsing)
-const KC_NAMES = {};
+const KC_NAMES: Record<string, number> = {};
 (() => {
   const az = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   for (let i = 0; i < 26; i++) KC_NAMES["KC_" + az[i]] = 0x04 + i;
@@ -441,11 +479,11 @@ const KC_NAMES = {};
 /* decoded key object types:
    none | trans | kc{code,mods} | mt{mods,tap} | lt{layer,tap}
    | mo/tg/to/df/osl/tt{layer} | osm{mods} | custom{label} | unknown{code} */
-const K_NONE = { t: "none" },
-  K_TRANS = { t: "trans" };
+const K_NONE: KeyDef = { t: "none" },
+  K_TRANS: KeyDef = { t: "trans" };
 
 // numeric QMK/Vial keycode -> decoded object (handles both old-Vial and new-QMK layer ranges)
-function decodeNum(n) {
+function decodeNum(n: number): KeyDef {
   if (n === 0) return K_NONE;
   if (n === 1) return K_TRANS;
   if (n <= 0xff) return { t: "kc", code: n, mods: 0 };
@@ -472,7 +510,7 @@ function decodeNum(n) {
 }
 
 // .vil keycode string -> decoded object
-const MT_MODS = {
+const MT_MODS: Record<string, number> = {
   LCTL: 1,
   CTL: 1,
   LSFT: 2,
@@ -510,7 +548,7 @@ const MT_MODS = {
   HYPR: 15,
   ALL: 15,
 };
-function parseVil(s) {
+function parseVil(s: string | number | null): KeyDef {
   if (s === -1 || s === "-1" || s == null) return K_NONE;
   if (typeof s === "number") return decodeNum(s);
   s = String(s).trim();
@@ -518,7 +556,7 @@ function parseVil(s) {
   if (s === "" || s === "KC_NO" || s === "KC_NONE") return K_NONE;
   if (s === "KC_TRNS" || s === "KC_TRANSPARENT") return K_TRANS;
   if (s in KC_NAMES) return { t: "kc", code: KC_NAMES[s], mods: 0 };
-  let m;
+  let m: RegExpMatchArray | null;
   if ((m = s.match(/^MO\((\d+)\)$/))) return { t: "mo", layer: +m[1] };
   if ((m = s.match(/^TG\((\d+)\)$/))) return { t: "tg", layer: +m[1] };
   if ((m = s.match(/^TO\((\d+)\)$/))) return { t: "to", layer: +m[1] };
@@ -530,17 +568,17 @@ function parseVil(s) {
   if ((m = s.match(/^OSM\((.+)\)$/))) return { t: "osm", mods: 2 };
   if ((m = s.match(/^LT(\d+)\((.+)\)$/)) || (m = s.match(/^LT\((\d+),\s*(.+)\)$/))) {
     const inner = parseVil(m[2]);
-    return { t: "lt", layer: +m[1], tap: inner.t === "kc" ? inner.code : 0 };
+    return { t: "lt", layer: +m[1], tap: inner.t === "kc" ? inner.code : 0 } as KeyDef;
   }
   if ((m = s.match(/^([A-Z_]+)_T\((.+)\)$/))) {
     const inner = parseVil(m[2]);
-    return { t: "mt", mods: MT_MODS[m[1]] || 0, tap: inner.t === "kc" ? inner.code : 0 };
+    return { t: "mt", mods: MT_MODS[m[1]] || 0, tap: inner.t === "kc" ? inner.code : 0 } as KeyDef;
   }
   if (
     (m = s.match(/^(LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI|C|S|A|G|LCA|LSA|LCAG|LCG|LSG|LAG|SGUI|MEH|HYPR)\((.+)\)$/))
   ) {
     const inner = parseVil(m[2]);
-    if (inner.t === "kc") return { t: "kc", code: inner.code, mods: inner.mods | (MT_MODS[m[1]] || 0) };
+    if (inner.t === "kc") return { t: "kc", code: inner.code, mods: (inner.mods ?? 0) | (MT_MODS[m[1]] || 0) };
     return { t: "custom", label: s };
   }
   return { t: "custom", label: s.replace(/^KC_/, "") };
@@ -548,10 +586,10 @@ function parseVil(s) {
 
 /* ---------- 3. Keymap state & reverse lookup ---------- */
 
-const KB = { layers: [], layerCount: 0, source: "sample" };
+const KB = { layers: [] as KeyDef[][][], layerCount: 0, source: "sample", label: "" };
 
 // shifted-symbol aliases (vial writes these in .vil files too)
-const SHIFTED_ALIAS = {
+const SHIFTED_ALIAS: Record<string, string> = {
   KC_EXLM: "LSFT(KC_1)",
   KC_AT: "LSFT(KC_2)",
   KC_HASH: "LSFT(KC_3)",
@@ -576,7 +614,7 @@ const SHIFTED_ALIAS = {
 };
 const KEYMAP_STORE_KEY = "vialTypingKeymap";
 
-function setKeymap(layers, source, label, restored) {
+function setKeymap(layers: KeyDef[][][], source: string, label?: string, restored?: boolean) {
   KB.layers = layers;
   KB.layerCount = layers.length;
   KB.source = source;
@@ -585,7 +623,7 @@ function setKeymap(layers, source, label, restored) {
   buildLayerTabs();
   rebuildLayerSelects();
   setViewLayer(0);
-  const st = document.getElementById("status");
+  const st = document.getElementById("status")!;
   if (source === "sample") {
     st.className = "";
     st.textContent = "キーマップ未読込（サンプル表示中）";
@@ -600,7 +638,7 @@ function setKeymap(layers, source, label, restored) {
 }
 
 // 直近のレイアウト定義＋キーマップをlocalStorageへ保存
-function saveKeymap(layers, source, label) {
+function saveKeymap(layers: KeyDef[][][], source: string, label?: string) {
   try {
     localStorage.setItem(
       KEYMAP_STORE_KEY,
@@ -653,7 +691,7 @@ function forgetSavedKeymap() {
   showKbPlaceholder();
   buildLayerTabs();
   rebuildLayerSelects();
-  const st = document.getElementById("status");
+  const st = document.getElementById("status")!;
   st.className = "";
   st.textContent = "キーボード未読込";
   updateForgetBtn();
@@ -662,7 +700,7 @@ function forgetSavedKeymap() {
 
 // 「保存を消す」ボタンは保存済みキーマップがあるときだけ表示
 function updateForgetBtn() {
-  const b = document.getElementById("btnForget");
+  const b = document.getElementById("btnForget") as HTMLButtonElement | null;
   if (!b) return;
   let has = false;
   try {
@@ -672,63 +710,64 @@ function updateForgetBtn() {
 }
 
 // transparent keys fall through to the base layer
-function effKey(L, r, c) {
+function effKey(L: number, r: number, c: number): KeyDef {
   let k = KB.layers[L]?.[r] ? KB.layers[L][r][c] : K_NONE;
   if (k.t === "trans" && L > 0) k = KB.layers[0][r][c];
   return k || K_NONE;
 }
-const handOf = (r) => (r < 4 ? "L" : "R");
+const handOf = (r: number) => (r < 4 ? "L" : "R");
 
 // tap output of a decoded key: {code, mods} or null
-function tapOf(k) {
-  if (k.t === "kc") return { code: k.code, mods: k.mods };
-  if (k.t === "mt" || k.t === "lt") return { code: k.tap, mods: 0 };
+function tapOf(k: KeyDef): { code: number; mods: number } | null {
+  if (k.t === "kc") return { code: k.code ?? 0, mods: k.mods ?? 0 };
+  if (k.t === "mt" || k.t === "lt") return { code: k.tap ?? 0, mods: 0 };
   return null;
 }
 
 // physical-key check: the matrix can contain keycodes at positions that have no
 // physical key on the board — those must never be suggested
-let _physRef = null,
-  _physSet = null;
-function physHas(r, c) {
+let _physRef: PhysKey[] | null = null,
+  _physSet: Set<string> | null = null;
+function physHas(r: number, c: number) {
   if (_physRef !== PHYS_KEYS) {
     _physRef = PHYS_KEYS;
     _physSet = new Set(PHYS_KEYS.map((k) => k.row + "," + k.col));
   }
-  return _physSet.has(r + "," + c);
+  return (_physSet as Set<string>).has(r + "," + c);
 }
 
 // 物理配置から指番号を推定する (1=親指, 2=人差し指, 3=中指, 4=薬指, 5=小指)
-const FINGER_NAMES = { 1: "親指", 2: "人差し指", 3: "中指", 4: "薬指", 5: "小指" };
-let _fingerRef = null;
-let _fingerMap = null;
-function fingerFor(row, col) {
+const FINGER_NAMES: Record<number, string> = { 1: "親指", 2: "人差し指", 3: "中指", 4: "薬指", 5: "小指" };
+let _fingerRef: PhysKey[] | null = null;
+let _fingerMap: Map<string, number> | null = null;
+function fingerFor(row: number, col: number): number | null {
   if (_fingerRef !== PHYS_KEYS) {
     _fingerRef = PHYS_KEYS;
     _fingerMap = buildFingerMap();
   }
-  return _fingerMap.get(row + "," + col) ?? null;
+  return _fingerMap?.get(row + "," + col) ?? null;
 }
 
 // ヒューリスティック: 盤面中央で左右の手に分け、分割型(偶数行数>=6)は各半分の最終行を親指、
 // それ以外は回転キーと横長キー(スペース等)を親指とする。残りは列単位で内側から
 // 人差し指×2列・中指・薬指・以降は小指を割り当て、キー1個だけの列は最寄りの列に合流する
 function buildFingerMap() {
-  const map = new Map();
+  const map = new Map<string, number>();
   if (!PHYS_KEYS.length) return map;
   const entries = PHYS_KEYS.map((k) => ({ k, cx: k.x + k.w / 2 }));
   const midX = (Math.min(...entries.map((e) => e.cx)) + Math.max(...entries.map((e) => e.cx))) / 2;
   const splitHalves = MATRIX_ROWS >= 6 && MATRIX_ROWS % 2 === 0;
   const thumbRows = splitHalves ? [MATRIX_ROWS / 2 - 1, MATRIX_ROWS - 1] : [];
-  const isThumb = (e) => (splitHalves ? thumbRows.includes(e.k.row) : e.k.r !== 0 || e.k.w >= 1.75);
+  const isThumb = (e: { k: PhysKey; cx: number }) =>
+    splitHalves ? thumbRows.includes(e.k.row) : e.k.r !== 0 || e.k.w >= 1.75;
   for (const hand of ["L", "R"]) {
     const handKeys = entries.filter((e) => (hand === "L" ? e.cx <= midX : e.cx > midX));
-    const fingerKeys = [];
+    const fingerKeys: { k: PhysKey; cx: number }[] = [];
     for (const e of handKeys) {
       if (isThumb(e)) map.set(e.k.row + "," + e.k.col, 1);
       else fingerKeys.push(e);
     }
-    const cols = [];
+    const cols: { x: number; keys: { k: PhysKey; cx: number }[] }[] = [];
     for (const e of fingerKeys.sort((a, b) => a.cx - b.cx)) {
       const col = cols[cols.length - 1];
       if (col && Math.abs(col.x - e.cx) < 0.55) {
@@ -755,17 +794,17 @@ function buildFingerMap() {
 
 // find a key holding shift. Searches `layer` first, then falls back to the base
 // layer (pressing Shift on base, then holding the layer key, keeps Shift active).
-function findShiftKey(layer, hand) {
-  const collect = (L) => {
-    const cands = [];
+function findShiftKey(layer: number, hand: string): ShiftKeyPos | null {
+  const collect = (L: number) => {
+    const cands: ShiftKeyPos[] = [];
     for (let r = 0; r < MATRIX_ROWS; r++)
       for (let c = 0; c < MATRIX_COLS; c++) {
         if (!physHas(r, c)) continue;
         const k = effKey(L, r, c);
         if (
           (k.t === "kc" && k.mods === 0 && (k.code === 0xe1 || k.code === 0xe5)) ||
-          (k.t === "mt" && modsHaveShift(k.mods)) ||
-          (k.t === "osm" && modsHaveShift(k.mods))
+          (k.t === "mt" && modsHaveShift(k.mods ?? 0)) ||
+          (k.t === "osm" && modsHaveShift(k.mods ?? 0))
         )
           cands.push({ r, c, plain: k.t === "kc" });
       }
@@ -777,7 +816,9 @@ function findShiftKey(layer, hand) {
     cands = collect(0);
     fromBase = true;
   }
-  cands.sort((a, b) => (handOf(a.r) === hand) - (handOf(b.r) === hand) || b.plain - a.plain);
+  cands.sort(
+    (a, b) => Number(handOf(a.r) === hand) - Number(handOf(b.r) === hand) || Number(b.plain) - Number(a.plain),
+  );
   if (!cands.length) return null;
   // fromBase: Shift only exists on the layer *before* switching, so it must be
   // pressed BEFORE (and held through) the layer key
@@ -785,13 +826,13 @@ function findShiftKey(layer, hand) {
 }
 
 // find a key on the base layer that reaches `layer` while held; returns its implied mods (for LM)
-function findLayerKey(layer) {
+function findLayerKey(layer: number): LayerKeyPos | null {
   for (let r = 0; r < MATRIX_ROWS; r++)
     for (let c = 0; c < MATRIX_COLS; c++) {
       if (!physHas(r, c)) continue;
       const k = effKey(0, r, c);
       if ((k.t === "mo" || k.t === "lt" || k.t === "tt" || k.t === "osl" || k.t === "lm") && k.layer === layer)
-        return { r, c, mods: k.t === "lm" ? k.mods : 0 };
+        return { r, c, mods: (k.t === "lm" ? k.mods : 0) ?? 0 };
     }
   return null;
 }
@@ -814,7 +855,7 @@ try {
 } catch {}
 
 // category of a character for layer preferences: digit / symbol / other(letters, space...)
-function charCategory(ch) {
+function charCategory(ch: string): "num" | "sym" | null {
   if (/[0-9]/.test(ch)) return "num";
   if (/[a-zA-Z\s]/.test(ch)) return null;
   return "sym";
@@ -824,8 +865,8 @@ function rebuildLayerSelects() {
   for (const [id, key] of [
     ["selNumLayer", "num"],
     ["selSymLayer", "sym"],
-  ]) {
-    const sel = document.getElementById(id);
+  ] as const) {
+    const sel = document.getElementById(id) as HTMLSelectElement | null;
     if (!sel) continue;
     sel.innerHTML = "";
     const optAuto = document.createElement("option");
@@ -843,13 +884,14 @@ function rebuildLayerSelects() {
   }
 }
 
-const charCache = new Map();
+const charCache = new Map<string, Hint | null>();
 // char -> {key:{r,c}, layer, shiftKey, layerKey} or null
-function findKeyForChar(ch) {
-  if (charCache.has(ch)) return charCache.get(ch);
+function findKeyForChar(ch: string): Hint | null {
+  const cached = charCache.get(ch);
+  if (cached !== undefined) return cached;
   const cat = charCategory(ch);
   const fixedL = cat && layerPref[cat] !== "auto" ? +layerPref[cat] : null;
-  const cands = [];
+  const cands: Hint[] = [];
   for (let L = 0; L < KB.layerCount; L++) {
     const layerKey = L === 0 ? null : findLayerKey(L);
     if (L > 0 && !layerKey) continue;
@@ -866,13 +908,13 @@ function findKeyForChar(ch) {
         if (tap.mods & 0x0d) continue;
         const chars = charsOf(tap.code);
         if (!chars) continue;
-        let needShift = null;
+        let needShift: boolean | null = null;
         if (modsHaveShift(tap.mods) || lkShift) {
           if (chars[1] === ch) needShift = false;
         } else if (chars[0] === ch) needShift = false;
         else if (chars[1] === ch) needShift = true;
         if (needShift === null) continue;
-        let shiftKey = null;
+        let shiftKey: ShiftKeyPos | null = null;
         if (needShift) {
           shiftKey = findShiftKey(L, handOf(r));
           if (!shiftKey) continue;
@@ -898,22 +940,22 @@ function findKeyForChar(ch) {
 
 /* ---------- 4. Keyboard rendering ---------- */
 
-const kbEl = document.getElementById("kb");
-const keyEls = new Map(); // "r,c" -> element
+const kbEl = document.getElementById("kb")!;
+const keyEls = new Map<string, HTMLElement>(); // "r,c" -> element
 let viewLayer = 0;
 
-function legendFor(k) {
+function legendFor(k: KeyDef): string {
   switch (k.t) {
     case "none":
       return "";
     case "trans":
       return "▽";
     case "kc": {
-      const ch = charsOf(k.code);
+      const ch = charsOf(k.code ?? 0);
       if (ch) {
         // Shift以外の修飾(Ctrl/Alt/GUI)が付くキーはショートカット扱い:
         // 全修飾(Shiftを含む) + シフト前のベースキー を表示する (例: LSG(3) -> Sft+GUI+3)
-        if (k.mods & 0x0d) {
+        if ((k.mods ?? 0) & 0x0d) {
           const raw = ch[0];
           const baseKey =
             raw === " "
@@ -925,25 +967,25 @@ function legendFor(k) {
                   : /^[a-z]$/.test(raw)
                     ? raw.toUpperCase()
                     : raw;
-          return modsLabel(k.mods) + "+" + baseKey;
+          return modsLabel(k.mods ?? 0) + "+" + baseKey;
         }
-        const c = modsHaveShift(k.mods) ? ch[1] : ch[0];
+        const c = modsHaveShift(k.mods ?? 0) ? ch[1] : ch[0];
         if (c === " ") return "Space";
         if (c === "\n") return "⏎";
         if (c === "\t") return "Tab";
         return /^[a-z]$/.test(c) ? c.toUpperCase() : c;
       }
-      const lbl = KEYLABELS[k.code] || "0x" + k.code.toString(16);
+      const lbl = KEYLABELS[k.code ?? 0] || "0x" + (k.code ?? 0).toString(16);
       return k.mods ? modsLabel(k.mods) + "+" + lbl : lbl;
     }
     case "mt":
-      return (modsLabel(k.mods) || "Mod") + "\n" + legendFor({ t: "kc", code: k.tap, mods: 0 });
+      return (modsLabel(k.mods ?? 0) || "Mod") + "\n" + legendFor({ t: "kc", code: k.tap, mods: 0 });
     case "lt":
       return "L" + k.layer + "\n" + legendFor({ t: "kc", code: k.tap, mods: 0 });
     case "mo":
       return "MO(" + k.layer + ")";
     case "lm":
-      return "LM(" + k.layer + (modsHaveShift(k.mods) ? ",Sft" : "") + ")";
+      return "LM(" + k.layer + (modsHaveShift(k.mods ?? 0) ? ",Sft" : "") + ")";
     case "tg":
       return "TG(" + k.layer + ")";
     case "to":
@@ -957,7 +999,7 @@ function legendFor(k) {
     case "osm":
       return "OSM";
     case "custom":
-      return k.label.length > 7 ? k.label.slice(0, 7) : k.label;
+      return (k.label ?? "").length > 7 ? (k.label ?? "").slice(0, 7) : (k.label ?? "");
     default:
       return "?";
   }
@@ -1003,7 +1045,7 @@ function renderKeyboard() {
 }
 
 // shifted character printed in the keycap corner (5 -> %, ; -> : ...)
-function shiftedSub(k) {
+function shiftedSub(k: KeyDef): string {
   const tap = tapOf(k);
   if (!tap || tap.mods) return "";
   const chars = charsOf(tap.code);
@@ -1038,7 +1080,7 @@ function updateLegends() {
 }
 
 function buildLayerTabs() {
-  const tabs = document.getElementById("layertabs");
+  const tabs = document.getElementById("layertabs")!;
   tabs.innerHTML = "";
   for (let i = 0; i < KB.layerCount; i++) {
     const b = document.createElement("button");
@@ -1048,7 +1090,7 @@ function buildLayerTabs() {
   }
 }
 
-function setViewLayer(i) {
+function setViewLayer(i: number) {
   viewLayer = i;
   document.querySelectorAll("#layertabs button").forEach((b, j) => {
     b.classList.toggle("active", j === i);
@@ -1065,20 +1107,20 @@ function clearHighlights() {
   }
 }
 
-function paintHint(hint) {
+function paintHint(hint: Hint | null) {
   clearHighlights();
   if (!hint) return;
   const shiftFirst = hint.shiftKey?.fromBase && hint.layerKey;
-  const mark = (pos, cls, order) => {
+  const mark = (pos: KeyPos | null, cls: string, order: number) => {
     const el = pos && keyEls.get(pos.r + "," + pos.c);
     if (!el) return;
     el.classList.add(cls);
-    if (order) el.dataset.order = order;
+    if (order) el.dataset.order = String(order);
     const finger = fingerFor(pos.r, pos.c);
     if (finger) {
       const tag = document.createElement("i");
       tag.className = "fingertag";
-      tag.textContent = finger;
+      tag.textContent = String(finger);
       tag.title = FINGER_NAMES[finger];
       el.appendChild(tag);
     }
@@ -1105,21 +1147,21 @@ function paintHint(hint) {
 const CMD_GET_LAYER_COUNT = 0x11,
   CMD_GET_BUFFER = 0x12;
 
-const KBLOG = [];
-function dlog(msg) {
+const KBLOG: string[] = [];
+function dlog(msg: string) {
   KBLOG.push(msg);
   console.log("[vial-typing]", msg);
   const el = document.getElementById("dbglog");
   if (el) el.textContent = KBLOG.join("\n");
 }
-const hex = (u8, n) =>
+const hex = (u8: Uint8Array, n: number) =>
   Array.from(u8.subarray(0, n))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join(" ");
 
 // wireless boards can be slow to answer the first command — retry with growing timeouts
-async function hidCmdRetry(dev, bytes, tries) {
-  let err;
+async function hidCmdRetry(dev: HIDDevice, bytes: number[], tries?: number): Promise<Uint8Array> {
+  let err: unknown;
   for (let i = 0; i < (tries || 3); i++) {
     try {
       return await hidCmd(dev, bytes, 1200 + i * 1200);
@@ -1130,15 +1172,15 @@ async function hidCmdRetry(dev, bytes, tries) {
   throw err;
 }
 
-function hidCmd(dev, bytes, timeoutMs) {
+function hidCmd(dev: HIDDevice, bytes: number[], timeoutMs?: number): Promise<Uint8Array> {
   const data = new Uint8Array(32);
   data.set(bytes);
-  return new Promise((resolve, reject) => {
+  return new Promise<Uint8Array>((resolve, reject) => {
     const timer = setTimeout(() => {
       dev.removeEventListener("inputreport", onRep);
       reject(new Error("デバイスからの応答がありません"));
     }, timeoutMs || 1500);
-    const onRep = (e) => {
+    const onRep = (e: HIDInputReportEvent) => {
       clearTimeout(timer);
       dev.removeEventListener("inputreport", onRep);
       resolve(new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength));
@@ -1154,7 +1196,7 @@ function hidCmd(dev, bytes, timeoutMs) {
 
 async function connectHID() {
   if (engine.running) engine.idle(); // reading a keymap resets to the pre-start menu
-  const st = document.getElementById("status");
+  const st = document.getElementById("status")!;
   if (!navigator.hid) {
     st.className = "err";
     st.textContent = "このブラウザはWebHID非対応です。Chrome/Edgeを使うか .vil を読み込んでください";
@@ -1231,7 +1273,7 @@ async function connectHID() {
       console.warn("definition read failed:", e);
       st.className = "err";
       st.textContent = "レイアウト定義の読み取りに失敗: " + e.message + "（読み取りログ参照）";
-      document.getElementById("dbgwrap").open = true;
+      (document.getElementById("dbgwrap") as HTMLDetailsElement).open = true;
       return;
     }
     st.textContent = "キーマップを読み取り中…";
@@ -1251,12 +1293,12 @@ async function connectHID() {
       const r = await hidCmdRetry(dev, [CMD_GET_BUFFER, (off >> 8) & 0xff, off & 0xff, size]);
       buf.set(r.subarray(4, 4 + size), off);
     }
-    const layers = [];
+    const layers: KeyDef[][][] = [];
     let i = 0;
     for (let L = 0; L < layerCount; L++) {
-      const g = [];
+      const g: KeyDef[][] = [];
       for (let r = 0; r < MATRIX_ROWS; r++) {
-        const row = [];
+        const row: KeyDef[] = [];
         for (let c = 0; c < MATRIX_COLS; c++) {
           row.push(decodeNum((buf[i] << 8) | buf[i + 1]));
           i += 2;
@@ -1281,9 +1323,9 @@ async function connectHID() {
   }
 }
 
-function loadVilText(text, name) {
+function loadVilText(text: string, name: string) {
   if (engine.running) engine.idle(); // loading a keymap resets to the pre-start menu
-  const st = document.getElementById("status");
+  const st = document.getElementById("status")!;
   try {
     const data = JSON.parse(text);
     if (data.layouts && data.matrix) {
@@ -1294,8 +1336,8 @@ function loadVilText(text, name) {
       return;
     }
     if (!Array.isArray(data.layout)) throw new Error("layoutがありません");
-    const layers = data.layout.map((layer) => {
-      const g = Array.from({ length: MATRIX_ROWS }, () => Array(MATRIX_COLS).fill(K_NONE));
+    const layers = (data.layout as (string | number)[][][]).map((layer) => {
+      const g: KeyDef[][] = Array.from({ length: MATRIX_ROWS }, () => Array(MATRIX_COLS).fill(K_NONE));
       layer.forEach((row, r) => {
         if (r < MATRIX_ROWS && Array.isArray(row))
           row.forEach((k, c) => {
@@ -1317,16 +1359,17 @@ function loadVilText(text, name) {
   }
 }
 
-document.getElementById("btnForget").addEventListener("click", forgetSavedKeymap);
-document.getElementById("btnConnect").addEventListener("click", connectHID);
-document.getElementById("btnVil").addEventListener("click", () => document.getElementById("vilFile").click());
-document.getElementById("vilFile").addEventListener("change", (e) => {
-  const f = e.target.files[0];
+document.getElementById("btnForget")!.addEventListener("click", forgetSavedKeymap);
+document.getElementById("btnConnect")!.addEventListener("click", connectHID);
+document.getElementById("btnVil")!.addEventListener("click", () => document.getElementById("vilFile")!.click());
+document.getElementById("vilFile")!.addEventListener("change", (e) => {
+  const input = e.target as HTMLInputElement;
+  const f = input.files?.[0];
   if (f) f.text().then((t) => loadVilText(t, f.name));
-  e.target.value = "";
+  input.value = "";
 });
 
-const dropEl = document.getElementById("drop");
+const dropEl = document.getElementById("drop")!;
 let dragDepth = 0;
 window.addEventListener("dragenter", (e) => {
   e.preventDefault();
@@ -1344,13 +1387,13 @@ window.addEventListener("drop", (e) => {
   e.preventDefault();
   dragDepth = 0;
   dropEl.classList.remove("show");
-  const f = e.dataTransfer.files[0];
+  const f = e.dataTransfer?.files[0];
   if (f) f.text().then((t) => loadVilText(t, f.name));
 });
 
 /* ---------- 6a. Romaji engine ---------- */
 
-const ROMAJI = {
+const ROMAJI: Record<string, string[]> = {
   あ: ["a"],
   い: ["i", "yi"],
   う: ["u", "wu"],
@@ -1505,7 +1548,7 @@ const ROMAJI_STYLE_PREFS = {
     じぇ: "zye",
   },
 };
-let romajiStyle = "hepburn";
+let romajiStyle: "hepburn" | "kunrei" = "hepburn";
 try {
   if (localStorage.getItem("cornixRomaji") === "kunrei") romajiStyle = "kunrei";
 } catch {}
@@ -1522,8 +1565,14 @@ function applyRomajiStyle() {
 }
 applyRomajiStyle();
 
-function tokenizeKana(word) {
-  const units = [];
+interface KanaUnit {
+  kana: string;
+  opts: string[];
+  sok?: boolean;
+  done?: string;
+}
+function tokenizeKana(word: string): KanaUnit[] {
+  const units: KanaUnit[] = [];
   let i = 0;
   while (i < word.length) {
     const two = word.substr(i, 2);
@@ -1545,7 +1594,7 @@ function tokenizeKana(word) {
     const u = units[j],
       nx = units[j + 1];
     if (u.sok) {
-      let cons = [];
+      let cons: string[] = [];
       if (nx?.opts.length) cons = [...new Set(nx.opts.map((o) => o[0]).filter((c) => !"aiueon".includes(c)))];
       u.opts = cons.concat(["ltu", "xtu", "ltsu"]);
     }
@@ -1557,25 +1606,11 @@ function tokenizeKana(word) {
   return units;
 }
 
-/* ---------- 6b. Practice data (data/*.json) ---------- */
+/* ---------- 6b. Practice data ---------- */
 
-// NOTE: fetchを使うためfile://では開けない。make runのhttpサーバー経由で開くこと
-async function loadPracticeData(name) {
-  const response = await fetch("data/" + name + ".json");
-  if (!response.ok) throw new Error(name + ".json の読み込みに失敗 (" + response.status + ")");
-  return response.json();
-}
-let EN_WORDS, EN_SENTS, JP_WORDS, JP_SENTS, SYM_ITEMS;
-try {
-  [EN_WORDS, EN_SENTS, JP_WORDS, JP_SENTS, SYM_ITEMS] = await Promise.all(
-    ["en_words", "en_sents", "jp_words", "jp_sents", "sym_items"].map(loadPracticeData),
-  );
-} catch (error) {
-  const status = document.getElementById("status");
-  status.className = "err";
-  status.textContent = "練習データ (data/*.json) の読み込みに失敗しました。make run のhttpサーバー経由で開いてください";
-  throw error;
-}
+// 出題データは src/data/*.json からバンドルされる（importはファイル冒頭）
+const JP_WORDS = JP_WORDS_DATA as [kana: string, display: string][];
+const JP_SENTS = JP_SENTS_DATA as [kana: string, display: string][];
 
 /* ---------- 6c. キー習得モード (keybr.com方式のキー解放) ---------- */
 
@@ -1590,8 +1625,8 @@ const GUIDED_SLOW_COLOR = [0xcc, 0x00, 0x00];
 const GUIDED_FAST_COLOR = [0x60, 0xd7, 0x88];
 
 // コーパス中の出現頻度順に文字を並べる (keybrのLetter.frequencyOrder相当。出現しない文字は含めない)
-function guidedFrequencyOrder(texts, accept) {
-  const freq = new Map();
+function guidedFrequencyOrder(texts: string[], accept: (ch: string) => boolean): string[] {
+  const freq = new Map<string, number>();
   for (const text of texts) {
     for (const raw of text) {
       const ch = raw.toLowerCase();
@@ -1599,14 +1634,18 @@ function guidedFrequencyOrder(texts, accept) {
       freq.set(ch, (freq.get(ch) || 0) + 1);
     }
   }
-  return [...freq.keys()].sort((a, b) => freq.get(b) - freq.get(a) || a.charCodeAt(0) - b.charCodeAt(0));
+  return [...freq.keys()].sort((a, b) => (freq.get(b) ?? 0) - (freq.get(a) ?? 0) || a.charCodeAt(0) - b.charCodeAt(0));
 }
 
-const guidedIsLetter = (ch) => ch >= "a" && ch <= "z";
-const guidedIsSymbol = (ch) => ch !== " " && !guidedIsLetter(ch); // 記号と数字（大文字は小文字化済み）
+const guidedIsLetter = (ch: string) => ch >= "a" && ch <= "z";
+const guidedIsSymbol = (ch: string) => ch !== " " && !guidedIsLetter(ch); // 記号と数字（大文字は小文字化済み）
 
 // 練習モード別のコース: 対象キーとそのコーパスでの解放順。打鍵統計はコース間で共有する
-const GUIDED_COURSES = {
+interface GuidedCourseOrder {
+  letters: string[];
+  symbols?: string[];
+}
+const GUIDED_COURSES: Record<"en" | "jp" | "sym", GuidedCourseOrder> = {
   en: { letters: guidedFrequencyOrder(EN_WORDS.concat(EN_SENTS), guidedIsLetter) },
   jp: {
     letters: guidedFrequencyOrder(
@@ -1625,18 +1664,53 @@ const GUIDED_TRACKED = [
   ...new Set(Object.values(GUIDED_COURSES).flatMap((course) => [...course.letters, ...(course.symbols || [])])),
 ];
 
+// 1走行分の記録。h は 文字 -> [打鍵数, ミス数, 平均打鍵時間ms]
+interface GuidedResult {
+  t: number;
+  h: Record<string, [number, number, number]>;
+}
+interface GuidedSample {
+  index: number;
+  timeToType: number;
+  filtered: number;
+}
+interface GuidedStat {
+  samples: GuidedSample[];
+  timeToType: number | null;
+  bestTimeToType: number | null;
+}
+// トラック上の1キー分の解放状態
+interface GuidedKey extends GuidedStat {
+  ch: string;
+  confidence: number | null;
+  bestConfidence: number | null;
+  included: boolean;
+  focused: boolean;
+}
+interface GuidedCourse {
+  letters: GuidedKey[];
+  symbols?: GuidedKey[];
+}
+// 走行中の1打鍵分の記録
+interface GuidedStep {
+  ch: string;
+  typo: boolean;
+  time: number;
+}
+type CourseId = "en" | "jp" | "sym";
+
 const guided = {
-  results: [], // 1走行分の記録 {t, h: {文字: [打鍵数, ミス数, 平均打鍵時間ms]}}
-  stats: new Map(),
-  courses: {}, // コースごとの解放状態 {en: {letters}, jp: {letters}, sym: {letters, symbols}}
-  course: "en", // パネルに表示中のコース
-  words: { en: [], jp: [], sym: [] }, // 練習モード別の出題プール
-  selected: null,
+  results: [] as GuidedResult[],
+  stats: new Map<string, GuidedStat>(),
+  courses: {} as Record<CourseId, GuidedCourse>, // コースごとの解放状態
+  course: "en" as CourseId, // パネルに表示中のコース
+  words: { en: [] as string[], jp: [] as [string, string][], sym: [] as string[] }, // 練習モード別の出題プール
+  selected: null as string | null,
 };
 
 function guidedLoad() {
   try {
-    const raw = JSON.parse(localStorage.getItem(GUIDED_STORE_KEY));
+    const raw = JSON.parse(localStorage.getItem(GUIDED_STORE_KEY) ?? "null");
     if (raw && raw.v === 1 && Array.isArray(raw.results)) guided.results = raw.results;
   } catch {}
 }
@@ -1648,13 +1722,15 @@ function guidedSave() {
 }
 
 // 信頼度 = 目標打鍵時間 / 実際の打鍵時間。1.0以上で「習得済み」(keybrのTarget.confidence相当)
-const guidedConfidence = (timeToType) => (timeToType == null ? null : GUIDED_TARGET_TIME / timeToType);
+const guidedConfidence = (timeToType: number | null) => (timeToType == null ? null : GUIDED_TARGET_TIME / timeToType);
 
 // 全記録からキー別の平滑打鍵時間と自己ベストを再計算する (keybrのMutableKeyStats相当)
 function guidedRebuildStats() {
-  const stats = new Map(GUIDED_TRACKED.map((ch) => [ch, { samples: [], timeToType: null, bestTimeToType: null }]));
+  const stats = new Map<string, GuidedStat>(
+    GUIDED_TRACKED.map((ch) => [ch, { samples: [], timeToType: null, bestTimeToType: null }]),
+  );
   guided.results.forEach((result, index) => {
-    for (const [ch, sample] of Object.entries(result.h)) {
+    for (const [ch, sample] of Object.entries(result.h) as [string, [number, number, number]][]) {
       const stat = stats.get(ch);
       const timeToType = sample[2];
       if (!stat || !(timeToType > 0)) continue;
@@ -1669,9 +1745,9 @@ function guidedRebuildStats() {
 }
 
 // 1トラック分の解放済みキーと注目キーを決める (keybrのGuidedLesson.update相当)
-function guidedTrackKeys(order) {
-  const keys = order.map((ch) => {
-    const stat = guided.stats.get(ch);
+function guidedTrackKeys(order: string[]): GuidedKey[] {
+  const keys = order.map((ch): GuidedKey => {
+    const stat = guided.stats.get(ch)!;
     return {
       ch,
       samples: stat.samples,
@@ -1708,17 +1784,17 @@ function guidedUpdateKeys() {
     jp: { letters: guidedTrackKeys(GUIDED_COURSES.jp.letters) },
     sym: {
       letters: guidedTrackKeys(GUIDED_COURSES.sym.letters),
-      symbols: guidedTrackKeys(GUIDED_COURSES.sym.symbols),
+      symbols: guidedTrackKeys(GUIDED_COURSES.sym.symbols!),
     },
   };
 }
 
-const guidedIncludedSet = (track) => new Set(track.filter((k) => k.included).map((k) => k.ch));
-const guidedFocusOf = (track) => track.find((k) => k.focused)?.ch ?? null;
+const guidedIncludedSet = (track: GuidedKey[]) => new Set(track.filter((k) => k.included).map((k) => k.ch));
+const guidedFocusOf = (track: GuidedKey[]) => track.find((k) => k.focused)?.ch ?? null;
 
 // 全コース・全トラックの解放済みキーの和集合（解放アナウンスの差分検出用）
 function guidedIncludedAll() {
-  const set = new Set();
+  const set = new Set<string>();
   for (const course of Object.values(guided.courses))
     for (const track of [course.letters, course.symbols])
       if (track) for (const key of track) if (key.included) set.add(key.ch);
@@ -1734,14 +1810,14 @@ function guidedBuildPools() {
     sym: guidedSymPool(
       guidedIncludedSet(courses.sym.letters),
       guidedFocusOf(courses.sym.letters),
-      guidedIncludedSet(courses.sym.symbols),
-      guidedFocusOf(courses.sym.symbols),
+      guidedIncludedSet(courses.sym.symbols!),
+      guidedFocusOf(courses.sym.symbols!),
     ),
   };
 }
 
 // 解放済みキーだけで綴れて注目キーを含む英単語
-function guidedEnPool(included, focused) {
+function guidedEnPool(included: Set<string>, focused: string | null): string[] {
   let words = EN_WORDS.filter((w) => w.length > 2 && [...w].every((ch) => included.has(ch)));
   if (focused) words = words.filter((w) => w.includes(focused));
   words = words.slice(0, 1000);
@@ -1750,7 +1826,7 @@ function guidedEnPool(included, focused) {
 }
 
 // 単語の標準ローマ字表記（各入力単位の第1候補をつないだもの）
-function guidedRomajiOf(kana) {
+function guidedRomajiOf(kana: string): string {
   return tokenizeKana(kana)
     .map((unit) => unit.opts[0] || "")
     .join("");
@@ -1767,7 +1843,7 @@ function guidedRefreshJpCourse() {
 }
 
 // 標準ローマ字が解放済みキーだけで打てる日本語単語
-function guidedJpPool(included, focused) {
+function guidedJpPool(included: Set<string>, focused: string | null): [string, string][] {
   const typeable = JP_WORDS.filter(([kana]) => [...guidedRomajiOf(kana)].every((ch) => included.has(ch)));
   let pool = focused ? typeable.filter(([kana]) => guidedRomajiOf(kana).includes(focused)) : typeable;
   if (pool.length < 5) pool = typeable;
@@ -1777,7 +1853,7 @@ function guidedJpPool(included, focused) {
 }
 
 // 解放済みキーだけで打てるかなを組み合わせた疑似単語（[かな, 表示] 形式）
-function guidedPseudoKana(included, focused) {
+function guidedPseudoKana(included: Set<string>, focused: string | null): [string, string] {
   const kanas = Object.keys(ROMAJI).filter(
     (kana) => !"んっ".includes(kana) && [...ROMAJI[kana][0]].every((ch) => included.has(ch)),
   );
@@ -1793,8 +1869,13 @@ function guidedPseudoKana(included, focused) {
 }
 
 // 英字も記号もそれぞれの解放済みキーに収まる記号行（不足分は識別子+記号で生成）
-function guidedSymPool(letters, letterFocus, symbols, symbolFocus) {
-  const typeable = (item) =>
+function guidedSymPool(
+  letters: Set<string>,
+  letterFocus: string | null,
+  symbols: Set<string>,
+  symbolFocus: string | null,
+): string[] {
+  const typeable = (item: string) =>
     [...item.toLowerCase()].every((ch) => ch === " " || (guidedIsLetter(ch) ? letters.has(ch) : symbols.has(ch)));
   let pool = SYM_ITEMS.filter(typeable);
   const focus = symbolFocus ?? letterFocus;
@@ -1808,10 +1889,15 @@ function guidedSymPool(letters, letterFocus, symbols, symbolFocus) {
 }
 
 // 解放済みの英字識別子を解放済みの記号でつないだ練習行
-function guidedSymLine(letters, letterFocus, symbols, symbolFocus) {
+function guidedSymLine(
+  letters: Set<string>,
+  letterFocus: string | null,
+  symbols: Set<string>,
+  symbolFocus: string | null,
+): string {
   const symbolList = [...symbols];
   const pickSymbol = () => symbolList[Math.floor(Math.random() * symbolList.length)];
-  const ident = (focus) => guidedPseudoWord([...letters], focus).slice(0, 4);
+  const ident = (focus: string | null) => guidedPseudoWord([...letters], focus).slice(0, 4);
   let line = ident(letterFocus);
   const joints = 1 + Math.floor(Math.random() * 3);
   for (let i = 0; i < joints; i++) {
@@ -1821,7 +1907,7 @@ function guidedSymLine(letters, letterFocus, symbols, symbolFocus) {
   return line;
 }
 
-function guidedPseudoWord(letters, focused) {
+function guidedPseudoWord(letters: string[], focused: string | null): string {
   let word = "";
   const len = 3 + Math.floor(Math.random() * 4);
   for (let i = 0; i < len; i++) word += letters[Math.floor(Math.random() * letters.length)];
@@ -1833,8 +1919,8 @@ function guidedPseudoWord(letters, focused) {
 }
 
 // 1走行分の打鍵記録をキー別ヒストグラムに集計して保存し、新たに解放されたキーを返す
-function guidedRecordRun(steps) {
-  const byChar = new Map();
+function guidedRecordRun(steps: GuidedStep[]): string[] {
+  const byChar = new Map<string, { hit: number; miss: number; time: number; count: number }>();
   for (const step of steps) {
     const ch = step.ch.toLowerCase(); // Shift打ちの大文字は同じ物理キーとして集計する
     if (!guided.stats.has(ch)) continue;
@@ -1847,7 +1933,7 @@ function guidedRecordRun(steps) {
       s.count += 1;
     }
   }
-  const histogram = {};
+  const histogram: Record<string, [number, number, number]> = {};
   for (const [ch, s] of byChar) {
     const timeToType = s.count > 0 ? Math.round(s.time / s.count) : 0;
     if (timeToType > 0 && (timeToType < 40 || timeToType > 12000)) continue; // 速すぎ/遅すぎは無効 (keybrのvalidateSample)
@@ -1866,9 +1952,9 @@ function guidedRecordRun(steps) {
 
 /* ---- キー習得モードの表示 ---- */
 
-const guidedWpm = (timeToType) => Math.round(12000 / timeToType);
+const guidedWpm = (timeToType: number) => Math.round(12000 / timeToType);
 
-function guidedKeyColor(confidence) {
+function guidedKeyColor(confidence: number): string {
   const t = Math.max(0, Math.min(1, confidence));
   const mix = GUIDED_SLOW_COLOR.map((c, i) => Math.round(c + (GUIDED_FAST_COLOR[i] - c) * t));
   return "rgb(" + mix.join(",") + ")";
@@ -1919,7 +2005,7 @@ function renderKeySet() {
 }
 
 // 直近サンプルの回帰直線の傾き = 学習率(WPM/走行) (keybrのLearningRateの簡易版)
-function guidedLearningRate(key) {
+function guidedLearningRate(key: GuidedKey): number | null {
   const samples = key.samples.slice(-30);
   if (samples.length < 5) return null;
   const ys = samples.map((s) => 12000 / s.filtered);
@@ -1938,8 +2024,8 @@ function guidedLearningRate(key) {
   return d ? (n * sxy - sx * sy) / d : null;
 }
 
-function renderKeyInfo(key) {
-  const pct = (c) => Math.round(c * 100) + "%";
+function renderKeyInfo(key: GuidedKey) {
+  const pct = (c: number) => Math.round(c * 100) + "%";
   let html = '<b class="gkey-name">' + key.ch.toUpperCase() + "</b>";
   if (!key.included) {
     html += " 🔒 未解放：前のキーがすべて目標速度（35 WPM）に達すると解放されます";
@@ -1948,13 +2034,13 @@ function renderKeyInfo(key) {
   } else {
     html +=
       " 直前 <b>" +
-      guidedWpm(key.timeToType) +
+      guidedWpm(key.timeToType!) +
       " WPM</b>（信頼度 " +
-      pct(key.confidence) +
+      pct(key.confidence!) +
       "）・自己ベスト <b>" +
-      guidedWpm(key.bestTimeToType) +
+      guidedWpm(key.bestTimeToType!) +
       " WPM</b>（" +
-      pct(key.bestConfidence) +
+      pct(key.bestConfidence!) +
       "）";
     const rate = guidedLearningRate(key);
     if (rate != null) html += "・学習率 " + (rate >= 0 ? "+" : "") + rate.toFixed(1) + " WPM/走行";
@@ -1964,15 +2050,15 @@ function renderKeyInfo(key) {
 
 // キー別の速度推移グラフ (keybrのKeyDetailsChart相当):
 // 走行ごとの速度の散布図 + 平滑速度の曲線 + 目標速度の水平線 + 現在位置の縦線
-function drawKeyChart(key) {
-  const canvas = $("keyChart");
+function drawKeyChart(key: GuidedKey) {
+  const canvas = $<HTMLCanvasElement>("keyChart");
   const cssWidth = canvas.clientWidth;
   const cssHeight = canvas.clientHeight;
   if (!cssWidth) return;
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(cssWidth * dpr);
   canvas.height = Math.round(cssHeight * dpr);
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d")!;
   ctx.scale(dpr, dpr);
   const css = getComputedStyle(document.body);
   const colors = {
@@ -2003,8 +2089,8 @@ function drawKeyChart(key) {
   yMin = Math.max(0, Math.floor(yMin / 5) * 5 - 5);
   yMax = Math.ceil(yMax / 5) * 5 + 5;
 
-  const px = (i) => box.x + (xMax > 1 ? ((i - 1) / (xMax - 1)) * box.w : box.w / 2);
-  const py = (wpm) => box.y + box.h - ((wpm - yMin) / (yMax - yMin)) * box.h;
+  const px = (i: number) => box.x + (xMax > 1 ? ((i - 1) / (xMax - 1)) * box.w : box.w / 2);
+  const py = (wpm: number) => box.y + box.h - ((wpm - yMin) / (yMax - yMin)) * box.h;
 
   // グリッドと軸
   ctx.lineWidth = 1;
@@ -2032,7 +2118,7 @@ function drawKeyChart(key) {
   ctx.textBaseline = "middle";
   for (let i = 0; i <= 5; i++) {
     const wpm = yMin + ((yMax - yMin) / 5) * i;
-    ctx.fillText(Math.round(wpm), box.x - 6, py(wpm));
+    ctx.fillText(String(Math.round(wpm)), box.x - 6, py(wpm));
   }
 
   if (!samples.length) {
@@ -2046,7 +2132,7 @@ function drawKeyChart(key) {
   ctx.textBaseline = "top";
   for (let i = 0; i <= 5; i++) {
     const v = 1 + ((xMax - 1) / 5) * i;
-    ctx.fillText(Math.round(v), px(v), box.y + box.h + 6);
+    ctx.fillText(String(Math.round(v)), px(v), box.y + box.h + 6);
   }
 
   // 目標速度の水平線
@@ -2106,8 +2192,8 @@ function guidedRenderAll() {
   const symbolFocus = course.symbols ? guidedFocusOf(course.symbols) : null;
   if (symbolFocus) parts.push("記号: " + symbolFocus);
   $("guidedStatus").textContent = parts.length ? parts.join(" ・ ") : "🎉 すべてのキーを解放しました";
-  $("btnGuidedReset").disabled = !guided.results.length;
-  document.querySelectorAll(".course-tabs button").forEach((b) => {
+  $<HTMLButtonElement>("btnGuidedReset").disabled = !guided.results.length;
+  document.querySelectorAll<HTMLButtonElement>(".course-tabs button").forEach((b) => {
     b.classList.toggle("active", b.dataset.course === guided.course);
   });
   renderKeySet();
@@ -2122,7 +2208,7 @@ const COMBO_STEP = 30; // every 30 consecutive hits ...
 const COMBO_BONUS = 1; // ... +1 second
 let runSeconds = 60; // one set length: 30s / 60s / 90s (sushida style)、0 = 無制限(タイムアウトなし)
 try {
-  const t = +localStorage.getItem("cornixTime");
+  const t = +(localStorage.getItem("cornixTime") ?? "");
   if ([0, 30, 60, 90].includes(t)) runSeconds = t;
 } catch {}
 // 無制限モードでは残り時間ではなく経過時間をカウントアップし、自動終了しない
@@ -2132,11 +2218,11 @@ const isUnlimited = () => runSeconds === 0;
 function resetTimeDisplay() {
   const lbl = document.getElementById("stTimeLbl");
   if (lbl) lbl.textContent = isUnlimited() ? "経過時間" : "残り時間";
-  const t = document.getElementById("stTime");
+  const t = document.getElementById("stTime")!;
   t.textContent = isUnlimited() ? "0.0" : runSeconds.toFixed(1);
   t.classList.remove("low");
 }
-const $ = (id) => document.getElementById(id);
+const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 /* ---- sound effects (WebAudio, synthesized — no asset files) ---- */
 let soundOn = true;
@@ -2144,24 +2230,25 @@ try {
   soundOn = localStorage.getItem("cornixSound") !== "0";
 } catch {}
 const audio = {
-  ctx: null,
-  tone(freq, dur, type, vol, delay = 0, freqEnd) {
-    const t0 = this.ctx.currentTime + delay;
-    const o = this.ctx.createOscillator(),
-      g = this.ctx.createGain();
+  ctx: null as AudioContext | null,
+  tone(freq: number, dur: number, type: OscillatorType, vol: number, delay = 0, freqEnd?: number) {
+    const ctx = this.ctx!;
+    const t0 = ctx.currentTime + delay;
+    const o = ctx.createOscillator(),
+      g = ctx.createGain();
     o.type = type;
     o.frequency.setValueAtTime(freq, t0);
     if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, t0 + dur);
     g.gain.setValueAtTime(vol, t0);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g).connect(this.ctx.destination);
+    o.connect(g).connect(ctx.destination);
     o.start(t0);
     o.stop(t0 + dur + 0.02);
   },
-  play(kind) {
+  play(kind: "type" | "miss" | "bonus") {
     if (!soundOn) return;
     try {
-      if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (!this.ctx) this.ctx = new AudioContext();
       if (this.ctx.state === "suspended") this.ctx.resume();
       if (kind === "type") this.tone(900 + Math.random() * 150, 0.045, "triangle", 0.07);
       else if (kind === "miss") this.tone(170, 0.18, "sawtooth", 0.09, 0, 110);
@@ -2181,30 +2268,37 @@ function updateSoundBtn() {
 }
 
 // shuffled-bag sampling: every entry appears once before any repeats
-const bags = {};
-function shuffle(a) {
+const bags: Record<string, unknown[]> = {};
+function shuffle<T>(a: T[]): T[] {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
-function drawFrom(list, key) {
+function drawFrom<T>(list: T[], key: string): T {
   if (!bags[key]?.length) bags[key] = shuffle(list.slice());
-  return bags[key].pop();
+  return bags[key].pop() as T;
+}
+
+// 出題1件: 英字系は text、日本語は kana を持つ
+interface PracticeItem {
+  text?: string;
+  kana?: string;
+  meta: string;
 }
 
 const engine = {
   mode: "en",
   guided: false, // キー習得モード（練習モードと直交する切替）
-  items: [],
+  items: [] as PracticeItem[],
   idx: 0,
   running: false,
   // en/sym
   text: "",
   pos: 0,
   // jp
-  units: [],
+  units: [] as KanaUnit[],
   unitIdx: 0,
   typed: "",
   softDone: false,
@@ -2218,17 +2312,17 @@ const engine = {
   maxCombo: 0,
   words: 0,
   bonusTotal: 0,
-  timerId: null,
-  hint: null,
+  timerId: 0 as ReturnType<typeof setInterval> | number,
+  hint: null as Hint | null,
   warn: "",
   counting: false,
-  countId: null,
+  countId: 0 as ReturnType<typeof setInterval> | number,
   // キー習得モードの打鍵記録
-  steps: [],
+  steps: [] as GuidedStep[],
   lastInputAt: 0,
   typoPending: false,
 
-  makeItem(mode) {
+  makeItem(mode?: string): PracticeItem {
     mode = mode || this.mode;
     if (mode === "mix") {
       const r = Math.random();
@@ -2256,7 +2350,7 @@ const engine = {
     const it = this.items[this.idx];
     return !!it?.kana;
   },
-  fillItems(n) {
+  fillItems(n: number) {
     for (let i = 0; i < n; i++) this.items.push(this.makeItem());
   },
 
@@ -2268,7 +2362,7 @@ const engine = {
         '<span class="rest" style="font-size:20px">⌨️ 先にキーボードを読み込んでください（「キーボードから読み取る」または vial.json / .vil をドロップ）</span>';
       return;
     }
-    if ($("resultDlg").open) $("resultDlg").close();
+    if ($<HTMLDialogElement>("resultDlg").open) $<HTMLDialogElement>("resultDlg").close();
     clearInterval(this.timerId);
     this.running = false;
     this.hint = null;
@@ -2278,13 +2372,13 @@ const engine = {
     $("queue").textContent = "";
     $("hint").innerHTML = "";
     resetTimeDisplay();
-    $("stWpm").textContent = 0;
+    $("stWpm").textContent = "0";
     $("stAcc").textContent = "100%";
-    $("stCombo").textContent = 0;
-    $("stMiss").textContent = 0;
+    $("stCombo").textContent = "0";
+    $("stMiss").textContent = "0";
     this.counting = true;
     $("typeline").classList.remove("idle");
-    const show = (txt, go) =>
+    const show = (txt: string | number, go?: boolean) =>
       ($("typeline").innerHTML = '<span class="countdown' + (go ? " go" : "") + '">' + txt + "</span>");
     let n = 3;
     show(n);
@@ -2311,7 +2405,7 @@ const engine = {
       // 最新の習得状況で出題プールを作り直す
       guidedUpdateKeys();
       guided.words = guidedBuildPools();
-      bags.g_en = bags.g_jp = bags.g_sym = null;
+      bags.g_en = bags.g_jp = bags.g_sym = [];
       this.steps = [];
       this.lastInputAt = 0;
       this.typoPending = false;
@@ -2349,10 +2443,10 @@ const engine = {
     $("queue").textContent = "";
     $("hint").innerHTML = "";
     resetTimeDisplay();
-    $("stWpm").textContent = 0;
+    $("stWpm").textContent = "0";
     $("stAcc").textContent = "100%";
-    $("stCombo").textContent = 0;
-    $("stMiss").textContent = 0;
+    $("stCombo").textContent = "0";
+    $("stMiss").textContent = "0";
   },
 
   tick() {
@@ -2404,7 +2498,7 @@ const engine = {
       this.typed = "";
       this.softDone = false;
     } else {
-      this.text = it.text;
+      this.text = it.text ?? "";
       this.pos = 0;
     }
     this.lastInputAt = 0; // 単語間の間隔は打鍵時間に含めない
@@ -2431,14 +2525,14 @@ const engine = {
     return o ? o[this.typed.length] : null;
   },
 
-  input(c) {
+  input(c: string) {
     if (!this.running || !this.items.length) return;
     if (this.isJP()) this.inputJP(c);
     else this.inputText(c);
     this.updateStats();
   },
 
-  inputText(c) {
+  inputText(c: string) {
     const t = this.text[this.pos];
     if (c === t) {
       if (this.guided) this.recordStep(t);
@@ -2454,14 +2548,14 @@ const engine = {
   },
 
   // 文字の確定1回を1打鍵として記録する。ミスした文字は打鍵時間の集計から除外される
-  recordStep(ch) {
+  recordStep(ch: string) {
     const now = Date.now();
     this.steps.push({ ch, typo: this.typoPending, time: this.lastInputAt ? now - this.lastInputAt : 0 });
     this.lastInputAt = now;
     this.typoPending = false;
   },
 
-  inputJP(c) {
+  inputJP(c: string) {
     const u = this.units[this.unitIdx];
     if (!u) return;
     const nt = this.typed + c;
@@ -2526,11 +2620,11 @@ const engine = {
     $("rRank").textContent = rank;
     $("rWpm").textContent = $("stWpm").textContent;
     $("rAcc").textContent = $("stAcc").textContent;
-    $("rMiss").textContent = this.miss;
-    $("rWords").textContent = this.words;
-    $("rCombo").textContent = this.maxCombo;
+    $("rMiss").textContent = String(this.miss);
+    $("rWords").textContent = String(this.words);
+    $("rCombo").textContent = String(this.maxCombo);
     $("rBonus").textContent = "+" + this.bonusTotal + "s";
-    $("resultDlg").showModal();
+    $<HTMLDialogElement>("resultDlg").showModal();
     this.idle();
   },
 
@@ -2561,7 +2655,7 @@ const engine = {
       meta = $("wordMeta"),
       q = $("queue");
     if (!this.items.length) return;
-    let done, cur, rest;
+    let done: string, cur: string, rest: string;
     if (this.isJP()) {
       const s = this.jpStrings();
       done = s.done;
@@ -2613,7 +2707,7 @@ const engine = {
     if (h.layer !== viewLayer) setViewLayer(h.layer);
     else paintHint(h);
     // ピアノ運指風の指番号バッジ（チップの上に重ねる）
-    const fingerBadge = (pos) => {
+    const fingerBadge = (pos: KeyPos | null) => {
       const finger = pos && fingerFor(pos.r, pos.c);
       return finger ? '<i class="fnum" title="' + FINGER_NAMES[finger] + '">' + finger + "</i>" : "";
     };
@@ -2666,28 +2760,28 @@ const engine = {
 
   updateStats() {
     const min = this.startTime ? (Date.now() - this.startTime) / 60000 : 0;
-    $("stWpm").textContent = min > 0 ? Math.round(this.correct / 5 / min) : 0;
+    $("stWpm").textContent = String(min > 0 ? Math.round(this.correct / 5 / min) : 0);
     const tot = this.correct + this.miss;
     $("stAcc").textContent = (tot ? Math.round((this.correct / tot) * 100) : 100) + "%";
-    $("stCombo").textContent = this.combo;
-    $("stMiss").textContent = this.miss;
+    $("stCombo").textContent = String(this.combo);
+    $("stMiss").textContent = String(this.miss);
   },
 };
 
-function dispChar(c) {
+function dispChar(c: string) {
   return c === " " ? "Space" : c === "\n" ? "Enter" : c === "\t" ? "Tab" : c;
 }
-function escapeHtml(s) {
+function escapeHtml(s: string) {
   return String(s).replace(
     /[&<>"']/g,
-    (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m],
+    (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m] as string,
   );
 }
 
 /* ---------- 6e. Input & UI wiring ---------- */
 
 document.addEventListener("keydown", (e) => {
-  if ($("resultDlg").open) return; // Esc closes the dialog natively
+  if ($<HTMLDialogElement>("resultDlg").open) return; // Esc closes the dialog natively
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Escape") {
     // Esc during a run/countdown = back to the pre-start menu
@@ -2723,30 +2817,30 @@ document.addEventListener("keydown", (e) => {
   engine.input(e.key === "¥" ? "\\" : e.key);
 });
 
-document.querySelectorAll(".modes button").forEach((b) => {
+document.querySelectorAll<HTMLButtonElement>(".modes button").forEach((b) => {
   b.addEventListener("click", () => {
     document.querySelectorAll(".modes button").forEach((x) => {
       x.classList.remove("active");
     });
     b.classList.add("active");
-    engine.mode = b.dataset.mode;
+    engine.mode = b.dataset.mode ?? "en";
     if (engine.mode !== "mix" && guided.course !== engine.mode) {
       // 練習モードに対応するコース表示へ自動で切り替える
-      guided.course = engine.mode;
+      guided.course = engine.mode as CourseId;
       guided.selected = null;
     }
     if (engine.guided) guidedRenderAll();
     engine.idle();
   });
 });
-document.querySelectorAll(".course-tabs button").forEach((b) => {
+document.querySelectorAll<HTMLButtonElement>(".course-tabs button").forEach((b) => {
   b.addEventListener("click", () => {
-    guided.course = b.dataset.course;
+    guided.course = b.dataset.course as CourseId;
     guided.selected = null;
     guidedRenderAll();
   });
 });
-document.querySelectorAll(".playstyle button").forEach((b) => {
+document.querySelectorAll<HTMLButtonElement>(".playstyle button").forEach((b) => {
   b.addEventListener("click", () => {
     document.querySelectorAll(".playstyle button").forEach((x) => {
       x.classList.remove("active");
@@ -2758,9 +2852,9 @@ document.querySelectorAll(".playstyle button").forEach((b) => {
     engine.idle();
   });
 });
-document.querySelectorAll(".times button").forEach((b) => {
+document.querySelectorAll<HTMLButtonElement>(".times button").forEach((b) => {
   b.addEventListener("click", () => {
-    runSeconds = +b.dataset.time;
+    runSeconds = +(b.dataset.time ?? 60);
     try {
       localStorage.setItem("cornixTime", String(runSeconds));
     } catch {}
@@ -2771,8 +2865,8 @@ document.querySelectorAll(".times button").forEach((b) => {
   });
 });
 // reflect persisted choice on load
-document.querySelectorAll(".times button").forEach((b) => {
-  b.classList.toggle("active", +b.dataset.time === runSeconds);
+document.querySelectorAll<HTMLButtonElement>(".times button").forEach((b) => {
+  b.classList.toggle("active", +(b.dataset.time ?? -1) === runSeconds);
 });
 
 $("btnDefDl").addEventListener("click", () => {
@@ -2790,12 +2884,12 @@ $("typeline").addEventListener("click", () => {
   if (!engine.running && !engine.counting) engine.start();
 });
 $("btnAgain").addEventListener("click", () => {
-  $("resultDlg").close();
+  $<HTMLDialogElement>("resultDlg").close();
   engine.start();
 });
-$("selOut").value = outMode;
+$<HTMLSelectElement>("selOut").value = outMode;
 $("selOut").addEventListener("change", () => {
-  outMode = $("selOut").value;
+  outMode = $<HTMLSelectElement>("selOut").value;
   try {
     localStorage.setItem("cornixOutMode", outMode);
   } catch {}
@@ -2803,18 +2897,18 @@ $("selOut").addEventListener("change", () => {
   updateLegends();
   engine.refreshHint();
 });
-$("selPref").value = keyPref.v;
+$<HTMLSelectElement>("selPref").value = keyPref.v;
 $("selPref").addEventListener("change", () => {
-  keyPref.v = $("selPref").value;
+  keyPref.v = $<HTMLSelectElement>("selPref").value;
   try {
     localStorage.setItem("cornixPref", keyPref.v);
   } catch {}
   charCache.clear(); // recompute guidance with the new preference
   engine.refreshHint();
 });
-$("selRomaji").value = romajiStyle;
+$<HTMLSelectElement>("selRomaji").value = romajiStyle;
 $("selRomaji").addEventListener("change", () => {
-  romajiStyle = $("selRomaji").value;
+  romajiStyle = $<HTMLSelectElement>("selRomaji").value as "hepburn" | "kunrei";
   try {
     localStorage.setItem("cornixRomaji", romajiStyle);
   } catch {}
@@ -2825,9 +2919,9 @@ $("selRomaji").addEventListener("change", () => {
 for (const [id, key, store] of [
   ["selNumLayer", "num", "cornixNumLayer"],
   ["selSymLayer", "sym", "cornixSymLayer"],
-]) {
+] as const) {
   $(id).addEventListener("change", () => {
-    layerPref[key] = $(id).value;
+    layerPref[key] = $<HTMLSelectElement>(id).value;
     try {
       localStorage.setItem(store, layerPref[key]);
     } catch {}
@@ -2864,7 +2958,7 @@ guidedUpdateKeys();
 engine.idle();
 
 // ウィンドウ幅に合わせてキーボードを再フィット（キーマップ読込時のみ）
-let resizeTimer = null;
+let resizeTimer: ReturnType<typeof setTimeout> | undefined;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {

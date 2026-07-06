@@ -1,9 +1,10 @@
-# app.js 全体構造
+# src/main.ts 全体構造
 
 Vial Typing のアプリケーション本体。Vial 対応キーボードからレイアウト定義とキーマップを読み取り、
-「次に押すべき物理キー」を案内しながらタイピング練習をさせる、単一ファイルの ES module。
-`index.html` から `<script type="module" src="app.js">` で読み込まれ、ビルドや外部ライブラリに依存しない
-（xz/lzma の展開のみ実行時に CDN から取得する）。
+「次に押すべき物理キー」を案内しながらタイピング練習をさせる、単一ファイルの TypeScript モジュール。
+Vite でビルドし（`npm run build` → `dist/`）、`src/index.html`・`src/style.css`・`src/data/*.json` と
+ともにバンドルされる。xz/lzma のデコーダは npm 依存（`xz-decompress`・`lzma`）として同梱し、
+必要時に動的 import で読み込む。
 
 ## データフロー
 
@@ -31,8 +32,8 @@ flowchart TD
   エンコーダ・装飾キー・非デフォルトのレイアウトオプションは除外する。
 - `applyDefinition()`: 任意の vial.json 形式定義（`{name, matrix, layouts.keymap}`）を適用して
   `MATRIX_ROWS/COLS`・`PHYS_KEYS`・キーボード名を差し替える汎用入口。
-- `getXz()` / `decompressDefinition()`: ファームウェア内蔵定義（xz または LZMA_ALONE 圧縮 JSON）を
-  CDN から取得したデコーダで展開する。
+- `decompressDefinition()`: ファームウェア内蔵定義（xz または LZMA_ALONE 圧縮 JSON）を
+  バンドル済みデコーダ（動的 import）で展開する。
 
 ## 2. Keycode tables & decoding — キーコード表とデコード
 
@@ -85,9 +86,8 @@ flowchart TD
 
 ## 6b. Practice data — 練習データ
 
-- `data/*.json`（英単語・英文・日本語単語・日本語文・記号行）を `fetch` で並列読込。
-  top-level await のため、**ここで失敗すると以降は実行されない**（ステータスにエラーを表示して停止。
-  `file://` では動かないので `make run` の http サーバー経由で開く）。
+- `src/data/*.json`（英単語・英文・日本語単語・日本語文・記号行）はファイル冒頭の `import` で
+  バンドルに含まれる（実行時の fetch は無い）。
 
 ## 6c. キー習得モード — keybr.com 方式のキー解放
 

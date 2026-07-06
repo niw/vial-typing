@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!data"]
+    "includes": ["**", "!src/data"]
   },
   "formatter": {
     "indentStyle": "space",
@@ -26,7 +26,8 @@
       },
       "style": {
         "useTemplate": "off",
-        "noDescendingSpecificity": "off"
+        "noDescendingSpecificity": "off",
+        "noNonNullAssertion": "off"
       },
       "suspicious": {
         "noAssignInExpressions": "off"
