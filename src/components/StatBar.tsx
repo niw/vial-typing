@@ -1,3 +1,4 @@
+import "./StatBar.css";
 import { engine } from "../lib/engine";
 import { isUnlimited, settings } from "../lib/settings";
 

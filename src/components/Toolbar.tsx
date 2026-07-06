@@ -1,3 +1,4 @@
+import "./Toolbar.css";
 import { audio } from "../lib/audio";
 import { engine } from "../lib/engine";
 import { type CourseId, guided, guidedRefreshJpCourse } from "../lib/guided";

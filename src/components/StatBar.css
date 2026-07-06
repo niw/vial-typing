@@ -1,0 +1,105 @@
+/* 統計表示: 残り時間・WPM・正確率・コンボ・ミス */
+
+@media (min-width: 1400px) {
+  .side .statbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 8px;
+    margin-bottom: 0;
+  }
+  .side .statbar .stat.time {
+    grid-column: 1 / -1;
+  }
+}
+
+.statbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px 28px;
+  margin-bottom: 16px;
+  padding: 2px 4px;
+}
+
+.statbar .stat {
+  text-align: center;
+}
+
+.statbar .stat .lbl {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  margin-bottom: 1px;
+}
+
+.statbar .stat b {
+  display: block;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--accent2);
+}
+
+.statbar .stat.time {
+  position: relative;
+}
+
+.statbar .stat.time b {
+  color: var(--accent);
+  font-size: 36px;
+}
+
+#stTime.low {
+  color: var(--bad);
+  animation: blink 0.6s ease-in-out infinite;
+}
+
+.bonus-pop {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  transform: translateX(-50%);
+  color: var(--good);
+  font-weight: 800;
+  font-size: 15px;
+  pointer-events: none;
+  animation: rise 0.9s ease-out forwards;
+}
+
+@keyframes rise {
+  to {
+    transform: translate(-50%, -24px);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .statbar {
+    gap: 6px 16px;
+    margin-bottom: 12px;
+  }
+  .statbar .stat .lbl {
+    font-size: 10px;
+  }
+  .statbar .stat b {
+    font-size: 22px;
+  }
+  .statbar .stat.time b {
+    font-size: 26px;
+  }
+}
+
+@media (max-width: 380px) {
+  .statbar {
+    gap: 4px 12px;
+  }
+  .statbar .stat b {
+    font-size: 19px;
+  }
+  .statbar .stat.time b {
+    font-size: 22px;
+  }
+}

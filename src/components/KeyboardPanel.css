@@ -1,0 +1,264 @@
+/* キーボード図・レイヤータブ・凡例・読み取りログ */
+
+.kb-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.kb-head .title {
+  font-size: 14px;
+  color: var(--dim);
+  margin-right: auto;
+}
+
+.layertabs {
+  display: flex;
+  gap: 4px;
+}
+
+.layertabs button {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.layertabs button.active {
+  background: linear-gradient(90deg, var(--accent), #ff8fb0);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 0 #d94a78;
+}
+
+#kbwrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+#kb {
+  position: relative;
+  margin: 0 auto;
+}
+
+.key {
+  position: absolute;
+  background: var(--key-bg);
+  border: 2px solid var(--key-border);
+  border-radius: 9px;
+  box-shadow: 0 3px 0 var(--key-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: calc(var(--u) * 0.26);
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  line-height: 1.1;
+  white-space: pre-line;
+  transition:
+    background 0.1s,
+    border-color 0.1s;
+}
+
+.key .sub {
+  position: absolute;
+  top: 1px;
+  right: 4px;
+  font-size: calc(var(--u) * 0.17);
+  color: #c79fe0;
+  font-weight: 700;
+}
+
+.key.dim {
+  color: #cdc4d8;
+}
+
+.key.hl-target {
+  background: #2bd97e;
+  border-color: #109d57;
+  color: #fff;
+  box-shadow:
+    0 0 14px rgba(43, 217, 126, 0.6),
+    0 3px 0 #109d57;
+  animation: pulse 0.9s ease-in-out infinite;
+}
+
+.key.hl-target .sub {
+  color: #d8ffe9;
+}
+
+.key.hl-shift {
+  background: #54a0ff;
+  border-color: #2f7de1;
+  color: #fff;
+  box-shadow:
+    0 0 12px rgba(84, 160, 255, 0.55),
+    0 3px 0 #2f7de1;
+}
+
+.key.hl-shift .sub {
+  color: #dceaff;
+}
+
+.key.hl-layer {
+  background: #ffb340;
+  border-color: #e8890c;
+  color: #fff;
+  box-shadow:
+    0 0 12px rgba(255, 179, 64, 0.6),
+    0 3px 0 #e8890c;
+}
+
+.key.hl-layer .sub {
+  color: #fff0d8;
+}
+
+.key.hl-alt {
+  border: 2px dashed var(--accent2);
+  background: #f4f1ff;
+  color: var(--accent2);
+}
+
+@keyframes pulse {
+  50% {
+    filter: brightness(1.12);
+    transform: scale(1.06);
+  }
+}
+
+.key[data-order]::after {
+  content: attr(data-order);
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--text);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.key.hl-target,
+.key.hl-shift,
+.key.hl-layer {
+  overflow: visible;
+  z-index: 2;
+}
+
+.key .fingertag {
+  position: absolute;
+  top: max(-9px, calc(var(--u) * -0.18));
+  left: 50%;
+  transform: translateX(-50%);
+  width: max(13px, calc(var(--u) * 0.3));
+  height: max(13px, calc(var(--u) * 0.3));
+  border-radius: 50%;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  font-style: normal;
+  font-size: max(9px, calc(var(--u) * 0.2));
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.key[style*="rotate"].hl-target {
+  animation: pulse-r 0.9s ease-in-out infinite;
+}
+
+@keyframes pulse-r {
+  50% {
+    filter: brightness(1.12);
+  }
+}
+
+.kb-placeholder {
+  text-align: center;
+  padding: 56px 16px;
+  color: var(--dim);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 2;
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+}
+
+.kb-placeholder span {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--dim);
+  flex-wrap: wrap;
+}
+
+.legend i {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  margin-right: 5px;
+  vertical-align: -2px;
+}
+
+.legend .lt {
+  background: #2bd97e;
+  border: 2px solid #109d57;
+}
+
+.legend .ls {
+  background: #54a0ff;
+  border: 2px solid #2f7de1;
+}
+
+.legend .ll {
+  background: #ffb340;
+  border: 2px solid #e8890c;
+}
+
+.note {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 12px;
+  line-height: 1.8;
+}
+
+.note code {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  padding: 1px 7px;
+  border-radius: 6px;
+}
+
+.note a {
+  color: var(--accent) !important;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .legend {
+    gap: 8px 12px;
+    font-size: 11px;
+  }
+  .kb-head .title {
+    font-size: 12px;
+  }
+}

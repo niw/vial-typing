@@ -1,0 +1,163 @@
+/* 全体共通: テーマ変数・リセット・ページ骨格・ボタン共通・ドロップオーバレイ */
+
+:root {
+  --bg: #fff8f3;
+  --panel: #ffffff;
+  --panel2: #fff4f7;
+  --border: #ffd9e4;
+  --text: #3a3340;
+  --dim: #9a8fa6;
+  --accent: #ff5d8f;
+  --accent2: #7c6cf6;
+  --good: #18b566;
+  --bad: #ff5252;
+  --warn: #ff9f1c;
+  --key-bg: #ffffff;
+  --key-bg2: #fdf3ff;
+  --key-border: #e8def2;
+  --u: 52px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Reactのマウント先。bodyのflexレイアウトに子要素を直接参加させる */
+#root {
+  display: contents;
+}
+
+body {
+  background:
+    radial-gradient(circle at 8% 12%, rgba(255, 93, 143, 0.1), transparent 30%),
+    radial-gradient(circle at 92% 20%, rgba(124, 108, 246, 0.1), transparent 32%),
+    radial-gradient(circle at 50% 95%, rgba(255, 159, 28, 0.1), transparent 35%), var(--bg);
+  color: var(--text);
+  font-family:
+    "Hiragino Maru Gothic ProN", "Zen Maru Gothic", "Hiragino Sans", "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px 48px;
+}
+
+.mono {
+  font-family: "SF Mono", "Cascadia Code", Consolas, Menlo, monospace;
+}
+
+button {
+  background: #fff;
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.12s,
+    background 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+  box-shadow: 0 2px 0 var(--border);
+}
+
+button:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 3px 0 #ffc2d4;
+}
+
+button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+button.primary {
+  background: linear-gradient(90deg, var(--accent), #ff8fb0);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 3px 0 #d94a78;
+}
+
+button.primary:hover {
+  border-color: #d94a78;
+  box-shadow: 0 4px 0 #d94a78;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.panel {
+  width: 100%;
+  max-width: 1080px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 22px;
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 6px 20px rgba(255, 93, 143, 0.08);
+}
+
+.layout {
+  width: 100%;
+  max-width: 1080px;
+}
+
+.main {
+  min-width: 0;
+}
+
+@media (min-width: 1400px) {
+  .layout {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+  .layout .side {
+    position: sticky;
+    top: 12px;
+  }
+}
+
+@keyframes blink {
+  50% {
+    filter: brightness(1.35);
+  }
+}
+
+#drop {
+  position: fixed;
+  inset: 0;
+  display: none;
+  background: rgba(255, 248, 243, 0.92);
+  border: 4px dashed var(--accent);
+  border-radius: 24px;
+  z-index: 50;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+#drop.show {
+  display: flex;
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 10px 8px 32px;
+  }
+  .panel {
+    padding: 12px;
+    border-radius: 16px;
+    margin-bottom: 12px;
+  }
+}

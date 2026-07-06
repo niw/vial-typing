@@ -1,3 +1,4 @@
+import "./KeyboardPanel.css";
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { currentExpected } from "../lib/hint";
 import { effKey, FINGER_NAMES, fingerFor, type Hint, KB, type KeyPos } from "../lib/kb";

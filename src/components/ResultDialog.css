@@ -1,0 +1,125 @@
+/* 結果ダイアログ */
+
+dialog {
+  margin: auto; /* the global `* { margin:0 }` reset broke <dialog> centering — restore it */
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 22px;
+  padding: 26px 30px;
+  width: min(92vw, 780px);
+  max-width: 780px;
+  box-shadow: 0 16px 48px rgba(255, 93, 143, 0.25);
+}
+
+dialog::backdrop {
+  background: rgba(58, 51, 64, 0.35);
+}
+
+.score-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin: 14px 0 4px;
+}
+
+.score-hero .rank {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 4px 14px rgba(124, 108, 246, 0.4);
+}
+
+.score-hero .num {
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.score-hero .unit {
+  font-size: 16px;
+  color: var(--dim);
+  align-self: flex-end;
+  padding-bottom: 8px;
+}
+
+.score-formula {
+  text-align: center;
+  font-size: 11px;
+  color: var(--dim);
+  margin-bottom: 14px;
+}
+
+#rUnlock {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--good);
+  margin-bottom: 14px;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin: 14px 0 18px;
+}
+
+.result-grid div {
+  background: var(--panel2);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 6px;
+  text-align: center;
+}
+
+.result-grid b {
+  display: block;
+  font-size: 24px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.result-grid span {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+@media (max-width: 640px) {
+  dialog {
+    padding: 18px 16px;
+    border-radius: 18px;
+  }
+  .score-hero {
+    gap: 12px;
+  }
+  .score-hero .rank {
+    width: 52px;
+    height: 52px;
+    font-size: 28px;
+  }
+  .score-hero .num {
+    font-size: 44px;
+  }
+  .result-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .result-grid b {
+    font-size: 20px;
+  }
+}

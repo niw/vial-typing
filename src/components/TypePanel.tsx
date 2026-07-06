@@ -1,3 +1,4 @@
+import "./TypePanel.css";
 import { engine } from "../lib/engine";
 import { currentExpected } from "../lib/hint";
 import { FINGER_NAMES, fingerFor, type Hint, type KeyPos } from "../lib/kb";

@@ -1,0 +1,150 @@
+/* ツールバー: モード・練習モード・プレイ時間・設定 */
+
+.pref {
+  font-size: 12px;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pref select {
+  background: #fff;
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--border);
+}
+
+.pref select:hover {
+  border-color: var(--accent);
+}
+
+@media (min-width: 1400px) {
+  .side .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.ctrl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ctrl-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+}
+
+.ctrl-group.settings {
+  margin-left: 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.modes {
+  display: flex;
+  gap: 4px;
+}
+
+.times {
+  display: flex;
+  gap: 4px;
+}
+
+.playstyle {
+  display: flex;
+  gap: 4px;
+}
+
+.modes button,
+.times button,
+.playstyle button {
+  padding: 4px 8px;
+  font-size: 10.5px;
+  box-shadow: 0 2px 0 var(--border);
+}
+
+.settings-row #btnSound {
+  padding: 5px 9px;
+  font-size: 10.5px;
+}
+
+.settings-row .pref {
+  font-size: 10px;
+  gap: 3px;
+}
+
+.settings-row .pref select {
+  padding: 4px 7px;
+  font-size: 10.5px;
+}
+
+.modes button.active {
+  background: linear-gradient(90deg, var(--accent2), #9d8ffa);
+  border-color: var(--accent2);
+  color: #fff;
+  box-shadow: 0 2px 0 #5e4fd4;
+}
+
+.times button.active {
+  background: linear-gradient(90deg, #18b566, #4dd694);
+  border-color: #18b566;
+  color: #fff;
+  box-shadow: 0 2px 0 #0e8a4c;
+}
+
+.playstyle button.active {
+  background: linear-gradient(90deg, var(--accent), #ff8fb0);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 0 #d94a78;
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    gap: 10px 14px;
+    align-items: flex-start;
+  }
+  .ctrl-group.settings {
+    margin-left: 0;
+  }
+  .ctrl-label {
+    font-size: 10px;
+  }
+  .modes button,
+  .times button,
+  .playstyle button {
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+  .pref {
+    font-size: 11px;
+  }
+  .pref select {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+}

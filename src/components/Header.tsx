@@ -1,3 +1,4 @@
+import "./Header.css";
 import { useRef } from "react";
 import { engine } from "../lib/engine";
 import { connectHID, loadVilText } from "../lib/hid";
