@@ -16,3 +16,7 @@ Vial対応キーボード全般で使えるタイピング練習サイト。
 ## 使い方
 
 ブラウザ（Chrome / Edge 推奨。WebHIDが必要）で開き、「キーボードから読み取る」を押すだけ。ビルド不要の単一HTMLファイルです。
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
