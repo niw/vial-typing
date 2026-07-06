@@ -16,6 +16,7 @@ Vial対応キーボード全般で使えるタイピング練習サイト。
 ## 使い方
 
 ブラウザ（Chrome / Edge 推奨。WebHIDが必要）で開き、「キーボードから読み取る」を押すだけ。
+macOS アプリ（下記）でも同じように使えます。
 
 ## 開発
 
@@ -28,6 +29,17 @@ npm run dev     # 開発サーバー（make run でも可）
 npm run build   # 型チェック + dist/ へビルド
 npm run test    # Playwrightテスト（ビルドして実行）
 npm run lint    # Biome
+```
+
+### macOS アプリ (Tauri)
+
+同じフロントを Tauri で包んで .app 化できます（`src-tauri/`）。WKWebView は WebHID 非対応なので、
+HIDアクセスだけ Rust (hidapi) 側に実装し、実行時に web/Tauri のトランスポートを切り替えています。
+Rust ツールチェーンが必要です。
+
+```sh
+npm run tauri:dev     # アプリを開発起動
+npm run tauri:build   # .app / .dmg をビルド
 ```
 
 ## License

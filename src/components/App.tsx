@@ -5,6 +5,7 @@ import { currentExpected } from "../lib/hint";
 import { KB } from "../lib/kb";
 import { isUnlimited } from "../lib/settings";
 import { invalidate, ui } from "../lib/store";
+import { DevicePicker } from "./DevicePicker";
 import { GuidedPanel } from "./GuidedPanel";
 import { Header } from "./Header";
 import { KeyboardPanel } from "./KeyboardPanel";
@@ -124,6 +125,7 @@ export function App() {
         .vil / vial.json をドロップして読み込み
       </div>
       <ResultDialog />
+      <DevicePicker />
     </>
   );
 }

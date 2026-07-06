@@ -1,5 +1,7 @@
-// WebHID (Vial/VIAプロトコル) でのキーマップ読み取りと .vil / vial.json の取り込み
+// Vial/VIAプロトコルでのキーマップ読み取りと .vil / vial.json の取り込み。
+// HIDの送受信はHidTransport越しに行い、ブラウザ(WebHID)とTauri(Rust)で共通のロジックが動く
 import { engine } from "./engine";
+import { getHidTransport, type HidConnection } from "./hidTransport";
 import { KB, setKeymap } from "./kb";
 import { decodeNum, K_NONE, type KeyDef, parseVil } from "./keycodes";
 import { parseKLE, type VialDefinition } from "./layout";
@@ -53,11 +55,11 @@ const hex = (u8: Uint8Array, n: number) =>
     .join(" ");
 
 // wireless boards can be slow to answer the first command — retry with growing timeouts
-async function hidCmdRetry(dev: HIDDevice, bytes: number[], tries?: number): Promise<Uint8Array> {
+async function hidCmdRetry(conn: HidConnection, bytes: number[], tries?: number): Promise<Uint8Array> {
   let err: unknown;
   for (let i = 0; i < (tries || 3); i++) {
     try {
-      return await hidCmd(dev, bytes, 1200 + i * 1200);
+      return await conn.command(bytes, 1200 + i * 1200);
     } catch (e) {
       err = e;
     }
@@ -65,69 +67,42 @@ async function hidCmdRetry(dev: HIDDevice, bytes: number[], tries?: number): Pro
   throw err;
 }
 
-function hidCmd(dev: HIDDevice, bytes: number[], timeoutMs?: number): Promise<Uint8Array> {
-  const data = new Uint8Array(32);
-  data.set(bytes);
-  return new Promise<Uint8Array>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      dev.removeEventListener("inputreport", onRep);
-      reject(new Error("デバイスからの応答がありません"));
-    }, timeoutMs || 1500);
-    const onRep = (e: HIDInputReportEvent) => {
-      clearTimeout(timer);
-      dev.removeEventListener("inputreport", onRep);
-      resolve(new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength));
-    };
-    dev.addEventListener("inputreport", onRep);
-    dev.sendReport(0, data).catch((err) => {
-      clearTimeout(timer);
-      dev.removeEventListener("inputreport", onRep);
-      reject(err);
-    });
-  });
-}
-
 export async function connectHID() {
   if (engine.running) engine.idle(); // reading a keymap resets to the pre-start menu
-  if (!navigator.hid) {
-    setStatus("err", "このブラウザはWebHID非対応です。Chrome/Edgeを使うか .vil を読み込んでください");
+  const transport = await getHidTransport();
+  if (!transport.available) {
+    setStatus("err", "この環境はHID接続に非対応です。Chrome/Edgeを使うか .vil を読み込んでください");
     return;
   }
-  let dev = null;
+  let conn: HidConnection | null = null;
   try {
-    const devs = await navigator.hid.requestDevice({
-      filters: [{ usagePage: 0xff60, usage: 0x61 }],
-    });
-    if (!devs.length) return;
-    dev = devs.find((d) => d.collections.some((c) => c.usagePage === 0xff60)) || devs[0];
-    if (!dev.opened) await dev.open();
+    conn = await transport.open();
+    if (!conn) return; // デバイス選択をキャンセル
     setStatus("", "レイアウト定義を読み取り中…");
     ui.log.length = 0;
     dlog(
       "デバイス: " +
-        (dev.productName || "(名称不明)") +
-        "  vendor=0x" +
-        dev.vendorId.toString(16) +
-        " product=0x" +
-        dev.productId.toString(16),
+        conn.label +
+        (conn.vendorId != null ? "  vendor=0x" + conn.vendorId.toString(16) : "") +
+        (conn.productId != null ? " product=0x" + conn.productId.toString(16) : ""),
     );
 
     // --- vial_get_size / vial_get_def: layout definition embedded in the firmware ---
     try {
       try {
-        const idr = await hidCmdRetry(dev, [0xfe, 0x00]); // vial_get_keyboard_id (optional)
+        const idr = await hidCmdRetry(conn, [0xfe, 0x00]); // vial_get_keyboard_id (optional)
         dlog("vial応答(FE00): " + hex(idr, 12) + "  → プロトコルv" + (idr[0] | (idr[1] << 8)));
       } catch {
         dlog("FE00応答なし（continue）");
       }
-      const szr = await hidCmdRetry(dev, [0xfe, 0x01]);
+      const szr = await hidCmdRetry(conn, [0xfe, 0x01]);
       dlog("サイズ応答(FE01): " + hex(szr, 8));
       const sz = (szr[0] | (szr[1] << 8) | (szr[2] << 16) | (szr[3] << 24)) >>> 0;
       dlog("定義サイズ: " + sz + " bytes");
       if (sz > 0 && sz < 200000) {
         const comp = new Uint8Array(sz);
         for (let blk = 0; blk * 32 < sz; blk++) {
-          const r = await hidCmdRetry(dev, [
+          const r = await hidCmdRetry(conn, [
             0xfe,
             0x02,
             blk & 0xff,
@@ -150,7 +125,7 @@ export async function connectHID() {
             " layouts=" +
             !!def.layouts?.keymap,
         );
-        applyDefinition(def, dev.productName);
+        applyDefinition(def, conn.label);
         dlog("レイアウト適用OK: " + KB.physKeys.length + "キー（マトリクス " + KB.rows + "x" + KB.cols + "）");
         dlog("--- 定義JSON全文（不具合報告用） ---");
         dlog(json);
@@ -170,7 +145,7 @@ export async function connectHID() {
 
     let layerCount = 4;
     try {
-      const r = await hidCmdRetry(dev, [CMD_GET_LAYER_COUNT]);
+      const r = await hidCmdRetry(conn, [CMD_GET_LAYER_COUNT]);
       if (r[1] >= 1 && r[1] <= 16) layerCount = r[1];
     } catch {
       /* keep default */
@@ -180,7 +155,7 @@ export async function connectHID() {
     const buf = new Uint8Array(total);
     for (let off = 0; off < total; off += 28) {
       const size = Math.min(28, total - off);
-      const r = await hidCmdRetry(dev, [CMD_GET_BUFFER, (off >> 8) & 0xff, off & 0xff, size]);
+      const r = await hidCmdRetry(conn, [CMD_GET_BUFFER, (off >> 8) & 0xff, off & 0xff, size]);
       buf.set(r.subarray(4, 4 + size), off);
     }
     const layers: KeyDef[][][] = [];
@@ -198,15 +173,15 @@ export async function connectHID() {
       layers.push(g);
     }
     dlog("キーマップ読み取りOK: " + layerCount + "レイヤー (" + KB.rows + "x" + KB.cols + ")");
-    setKeymap(layers, "hid", KB.name || dev.productName || "Keyboard");
+    setKeymap(layers, "hid", KB.name || conn.label || "Keyboard");
   } catch (err) {
     setStatus("err", "読み取り失敗: " + err.message + "（USB接続を確認するか .vil を読み込んでください）");
   } finally {
     // release the raw-HID interface right away — only one app can hold it,
     // and keeping it open blocks Vial from connecting to the keyboard
-    if (dev?.opened) {
+    if (conn) {
       try {
-        await dev.close();
+        await conn.close();
       } catch {}
     }
   }

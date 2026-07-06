@@ -2,3 +2,7 @@ node_modules/
 dist/
 test-results/
 playwright-report/
+
+# Tauri (Rust build artifacts and generated schemas)
+src-tauri/target/
+src-tauri/gen/

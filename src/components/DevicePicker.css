@@ -1,0 +1,32 @@
+/* デバイス選択ダイアログ (Tauri版のみ) */
+
+#devicePicker h2 {
+  font-size: 18px;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.device-list .device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  text-align: left;
+}
+.device-list .device b {
+  font-size: 14px;
+}
+.device-list .device .mono {
+  font-size: 12px;
+  color: var(--dim);
+}
+.device-cancel {
+  text-align: center;
+  margin-top: 16px;
+}
