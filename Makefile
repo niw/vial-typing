@@ -10,12 +10,17 @@ run:
 build:
 	npm run build
 
-# macOSアプリ (Tauri) を開発起動する
+# Run the macOS app (Tauri) in development
 .PHONY: tauri-dev
 tauri-dev:
 	npm run tauri:dev
 
-# macOSアプリ (.app / .dmg) をビルドする
+# Build the macOS app (.app / .dmg)
 .PHONY: tauri-build
 tauri-build:
 	npm run tauri:build
+
+# Remove all untracked and ignored files (node_modules, dist/, src-tauri/target/, etc.)
+.PHONY: clean
+clean:
+	git clean -dffx
