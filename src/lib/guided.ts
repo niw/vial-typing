@@ -95,6 +95,8 @@ export const guided = {
   course: "en" as CourseId, // the course currently shown in the panel
   words: { en: [] as string[], jp: [] as [string, string][], sym: [] as string[] }, // word pools per practice mode
   selected: null as string | null,
+  lastTyped: null as string | null, // the most recently typed key while running (follows the live chart); cleared when idle
+  pending: null as GuidedResult | null, // in-progress run overlaid on the committed results for a live chart/unlock preview
   rev: 0, // bumped on record/reset (triggers a graph redraw)
 };
 
@@ -119,7 +121,9 @@ export function guidedRebuildStats() {
   const stats = new Map<string, GuidedStat>(
     GUIDED_TRACKED.map((ch) => [ch, { samples: [], timeToType: null, bestTimeToType: null }]),
   );
-  guided.results.forEach((result, index) => {
+  // fold the in-progress run in as a trailing (uncommitted) sample so the chart and unlock state update live
+  const runs = guided.pending ? [...guided.results, guided.pending] : guided.results;
+  runs.forEach((result, index) => {
     for (const [ch, sample] of Object.entries(result.h) as [string, [number, number, number]][]) {
       const stat = stats.get(ch);
       const timeToType = sample[2];
@@ -308,8 +312,8 @@ function guidedPseudoWord(letters: string[], focused: string | null): string {
   return word;
 }
 
-// aggregate one run's keystroke records into a per-key histogram, save it, and return newly unlocked keys
-export function guidedRecordRun(steps: GuidedStep[]): string[] {
+// aggregate a run's confirmed keystrokes into a per-key histogram (char -> [hits, misses, avg time-to-type ms])
+function guidedBuildHistogram(steps: GuidedStep[]): Record<string, [number, number, number]> {
   const byChar = new Map<string, { hit: number; miss: number; time: number; count: number }>();
   for (const step of steps) {
     const ch = step.ch.toLowerCase(); // count a shifted uppercase letter under the same physical key
@@ -329,8 +333,17 @@ export function guidedRecordRun(steps: GuidedStep[]): string[] {
     if (timeToType > 0 && (timeToType < 40 || timeToType > 12000)) continue; // discard implausibly fast/slow samples (keybr's validateSample)
     histogram[ch] = [s.hit, s.miss, timeToType];
   }
+  return histogram;
+}
+
+// aggregate one run's keystroke records into a per-key histogram, save it, and return newly unlocked keys
+export function guidedRecordRun(steps: GuidedStep[]): string[] {
+  const histogram = guidedBuildHistogram(steps);
   if (Object.keys(histogram).length < 3) return []; // don't record a run with too few distinct characters
+  // read the unlock state as the user last saw it live (pending overlay still applied) so keys already
+  // shown unlocking during the run aren't re-announced in the result dialog
   const before = guidedIncludedAll();
+  guided.pending = null; // drop the preview overlay so the committed run isn't counted twice
   guided.results.push({ t: Date.now(), h: histogram });
   if (guided.results.length > GUIDED_MAX_RESULTS) guided.results.splice(0, guided.results.length - GUIDED_MAX_RESULTS);
   guidedSave();
@@ -339,6 +352,16 @@ export function guidedRecordRun(steps: GuidedStep[]): string[] {
   guided.rev++;
   invalidate();
   return [...guidedIncludedAll()].filter((ch) => !before.has(ch));
+}
+
+// overlay the in-progress run: recompute stats/unlock state as if the current keystrokes were a finished run,
+// without persisting. Drives the real-time chart and mid-run unlocking; reverted on finish/abort.
+export function guidedPreview(steps: GuidedStep[]) {
+  const histogram = guidedBuildHistogram(steps);
+  guided.pending = Object.keys(histogram).length ? { t: Date.now(), h: histogram } : null;
+  guidedRebuildStats();
+  guidedUpdateKeys();
+  invalidate();
 }
 
 export const guidedWpm = (timeToType: number) => Math.round(12000 / timeToType);
@@ -357,7 +380,13 @@ export function guidedCourseTracks() {
 
 export function guidedSelectedKey() {
   const all = guidedCourseTracks().flat();
-  return all.find((k) => k.ch === guided.selected) ?? all.find((k) => k.focused) ?? all[0];
+  // a chip the user pinned by clicking wins; otherwise while typing follow the most recently typed key, then the focus key
+  return (
+    (guided.selected ? all.find((k) => k.ch === guided.selected) : undefined) ??
+    (guided.lastTyped ? all.find((k) => k.ch === guided.lastTyped) : undefined) ??
+    all.find((k) => k.focused) ??
+    all[0]
+  );
 }
 
 // slope of the regression line over recent samples = learning rate (WPM/run) (a simplified version of keybr's LearningRate)
@@ -394,6 +423,7 @@ export function guidedImport(results: unknown) {
     : [];
   guided.results = valid.slice(-GUIDED_MAX_RESULTS);
   guided.selected = null;
+  guided.pending = null;
   guidedSave();
   guidedRebuildStats();
   guidedUpdateKeys();
@@ -405,6 +435,7 @@ export function guidedImport(results: unknown) {
 export function guidedReset() {
   guided.results = [];
   guided.selected = null;
+  guided.pending = null;
   try {
     localStorage.removeItem(GUIDED_STORE_KEY);
   } catch {}

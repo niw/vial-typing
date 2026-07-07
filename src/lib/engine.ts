@@ -2,7 +2,15 @@
 // invalidate() to notify React to re-render (the type line, stats, and hints are all derived from state)
 import { audio } from "./audio";
 import { EN_SENTS, EN_WORDS, JP_SENTS, JP_WORDS, SYM_ITEMS } from "./data";
-import { type GuidedStep, guided, guidedBuildPools, guidedRecordRun, guidedUpdateKeys } from "./guided";
+import {
+  type GuidedStep,
+  guided,
+  guidedBuildPools,
+  guidedPreview,
+  guidedRebuildStats,
+  guidedRecordRun,
+  guidedUpdateKeys,
+} from "./guided";
 import { t } from "./i18n";
 import { findKeyForChar, KB } from "./kb";
 import { type KanaUnit, tokenizeKana } from "./romaji";
@@ -81,6 +89,7 @@ export const engine = {
   bonusPopSeq: 0,
   // keystroke records for key-mastery mode
   steps: [] as GuidedStep[],
+  previewedSteps: 0, // number of steps already folded into the live preview overlay
   lastInputAt: 0,
   typoPending: false,
 
@@ -168,7 +177,11 @@ export const engine = {
   beginRun() {
     clearInterval(this.timerId);
     if (this.guided) {
-      // rebuild the item pool based on the latest mastery status
+      // rebuild the item pool based on the latest mastery status (dropping any leftover preview overlay)
+      guided.pending = null;
+      guided.lastTyped = null;
+      this.previewedSteps = 0;
+      guidedRebuildStats();
       guidedUpdateKeys();
       guided.words = guidedBuildPools();
       bags.g_en = bags.g_jp = bags.g_sym = [];
@@ -196,6 +209,14 @@ export const engine = {
     this.running = false;
     this.items = [];
     this.notice = null;
+    guided.lastTyped = null; // stop following the last-typed key; revert the chart to the focus key
+    if (guided.pending) {
+      // an aborted run: drop the preview overlay and revert the chart/unlock view to committed data
+      guided.pending = null;
+      this.previewedSteps = 0;
+      guidedRebuildStats();
+      guidedUpdateKeys();
+    }
     this.resetRunStats();
     invalidate();
   },
@@ -205,7 +226,12 @@ export const engine = {
       this.finish();
       return;
     }
-    invalidate(); // update the remaining-time/WPM display
+    if (this.guided && this.steps.length !== this.previewedSteps) {
+      this.previewedSteps = this.steps.length;
+      guidedPreview(this.steps); // live chart + mid-run unlock overlay (also invalidates)
+    } else {
+      invalidate(); // update the remaining-time/WPM display
+    }
   },
 
   onCorrect() {
@@ -296,6 +322,7 @@ export const engine = {
   recordStep(ch: string) {
     const now = Date.now();
     this.steps.push({ ch, typo: this.typoPending, time: this.lastInputAt ? now - this.lastInputAt : 0 });
+    guided.lastTyped = ch.toLowerCase(); // point the live chart at the key just typed
     this.lastInputAt = now;
     this.typoPending = false;
   },
@@ -348,6 +375,7 @@ export const engine = {
     if (this.guided && this.steps.length) {
       unlocked = guidedRecordRun(this.steps);
       this.steps = [];
+      this.previewedSteps = 0;
     }
     const min = this.startTime ? (Date.now() - this.startTime) / 60000 : 0;
     const wpm = min > 0 ? Math.round(this.correct / 5 / min) : 0;

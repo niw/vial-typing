@@ -72,7 +72,12 @@ export function GuidedPanel() {
         {guidedCourseTracks().map((track, trackIndex) => (
           <div className="keyrow" key={trackIndex === 0 ? "letters" : "symbols"}>
             {track.map((key) => (
-              <GKeyChip key={key.ch} guidedKey={key} isSelected={key === selected} />
+              <GKeyChip
+                key={key.ch}
+                guidedKey={key}
+                isSelected={key === selected}
+                isPinned={key.ch === guided.selected}
+              />
             ))}
           </div>
         ))}
@@ -85,11 +90,20 @@ export function GuidedPanel() {
   );
 }
 
-function GKeyChip({ guidedKey: key, isSelected }: { guidedKey: GuidedKey; isSelected: boolean }) {
+function GKeyChip({
+  guidedKey: key,
+  isSelected,
+  isPinned,
+}: {
+  guidedKey: GuidedKey;
+  isSelected: boolean;
+  isPinned: boolean;
+}) {
   const classes = ["gkey"];
   if (!key.included) classes.push("locked");
   if (key.focused) classes.push("focused");
   if (isSelected) classes.push("selected");
+  if (isPinned) classes.push("pinned"); // the user pinned this cell (vs. auto-following the last-typed/focus key)
   const colored = key.included && key.confidence != null;
   if (colored) classes.push("colored");
   const name = key.ch.toUpperCase();
@@ -105,7 +119,8 @@ function GKeyChip({ guidedKey: key, isSelected }: { guidedKey: GuidedKey; isSele
       style={colored ? { background: guidedKeyColor(key.confidence ?? 0) } : undefined}
       title={title}
       onClick={() => {
-        guided.selected = key.ch;
+        // toggle: pin this key on the first click, release back to auto-follow on the second
+        guided.selected = guided.selected === key.ch ? null : key.ch;
         invalidate();
       }}
     >

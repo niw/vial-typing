@@ -265,6 +265,69 @@ test("records keystrokes and colors keys during a key-mastery run", async ({ pag
   await expect(page.locator("#keyset .gkey.colored")).not.toHaveCount(0);
 });
 
+test("updates the chart and unlock view live during a key-mastery run", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate((keymap) => {
+    localStorage.setItem("vialTypingKeymap", JSON.stringify(keymap));
+    localStorage.setItem("cornixTime", "0"); // unlimited: the run keeps going while we inspect it mid-run
+  }, fakeKeymap());
+  await page.reload();
+  await expect(page.locator("#status")).toHaveClass(/ok/);
+  await page.getByRole("button", { name: "Key Mastery" }).click();
+
+  // No records yet, so the unlocked keys start uncolored
+  await expect(page.locator("#keyset .gkey.colored")).toHaveCount(0);
+
+  await page.locator("#typeline").click();
+  await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 }); // 3-2-1 countdown
+  let last = "";
+  for (let i = 0; i < 24; i++) {
+    const ch = ((await page.locator("#typeline .cur").textContent()) ?? "").trim();
+    await page.keyboard.press(ch);
+    if (ch) last = ch;
+    await page.waitForTimeout(60);
+  }
+
+  // Still running (no Escape): the live overlay has already colored keys, and nothing is persisted yet
+  await expect(page.locator("#keyset .gkey.colored")).not.toHaveCount(0);
+  // The chart/detail follows the most recently typed key, and auto-follow does not pin any cell
+  await expect(page.locator("#keyInfo .gkey-name")).toHaveText(last.toUpperCase());
+  await expect(page.locator("#keyset .gkey.pinned")).toHaveCount(0);
+  const stored = await page.evaluate(() => localStorage.getItem("vialTypingGuided"));
+  expect(stored).toBeNull();
+
+  // Aborting the run (switch to Normal, then back) reverts the overlay to committed data (none)
+  await page.getByRole("button", { name: "Normal" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await expect(page.locator("#keyset .gkey.colored")).toHaveCount(0);
+});
+
+test("clicking a key chip pins the chart, clicking it again returns to auto-follow", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Key Mastery" }).click();
+
+  // Idle default: the chart follows the focus key
+  const focused = ((await page.locator("#keyset .gkey.focused").textContent()) ?? "").trim();
+  await expect(page.locator("#keyInfo .gkey-name")).toHaveText(focused.toUpperCase());
+
+  // Pin a different unlocked key by clicking its chip
+  const others = (await page.locator("#keyset .gkey:not(.locked)").allTextContents())
+    .map((s) => s.trim())
+    .filter((ch) => ch && ch !== focused);
+  const pinned = others[0];
+  const chip = page.locator("#keyset .gkey", { hasText: new RegExp(`^${pinned}$`) });
+  await chip.click();
+  await expect(chip).toHaveClass(/pinned/);
+  await expect(page.locator("#keyInfo .gkey-name")).toHaveText(pinned.toUpperCase());
+  await expect(page.locator("#keyset .gkey.pinned")).toHaveCount(1); // only one cell is pinned
+
+  // Click the same chip again to release the pin and return to the focus key
+  await chip.click();
+  await expect(chip).not.toHaveClass(/pinned/);
+  await expect(page.locator("#keyset .gkey.pinned")).toHaveCount(0);
+  await expect(page.locator("#keyInfo .gkey-name")).toHaveText(focused.toUpperCase());
+});
+
 test("records keystrokes during a Japanese run in key-mastery mode too", async ({ page }) => {
   await page.goto("/");
   await page.evaluate((keymap) => {

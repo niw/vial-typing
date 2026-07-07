@@ -114,6 +114,25 @@
   border-color: var(--accent);
 }
 
+/* a cell the user pinned by clicking: a solid accent ring plus a corner dot, distinct from the auto-followed/focus cell */
+.gkey.pinned {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+.gkey.pinned::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  z-index: 1;
+}
+
 .guided-detail {
   background: var(--panel2);
   border: 2px solid var(--border);
