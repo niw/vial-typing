@@ -2,7 +2,7 @@ import "./DevicePicker.css";
 import { useEffect, useRef } from "react";
 import { picker, resolveDevicePick } from "../lib/devicePicker";
 
-// Tauri版でHIDデバイスが複数見つかったときの選択ダイアログ（Webはブラウザのダイアログを使う）
+// Selection dialog shown on the Tauri build when multiple HID devices are found (the web build uses the browser's own dialog)
 export function DevicePicker() {
   const ref = useRef<HTMLDialogElement>(null);
   const devices = picker.devices;

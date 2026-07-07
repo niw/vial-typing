@@ -1,5 +1,5 @@
-// WebKit(WKWebView)はWebHID非対応なので、raw HIDアクセスをRust側(hidapi)で提供し、
-// フロントエンドからinvokeで叩けるようにする。プロトコル処理はフロント側(hid.ts)が担う。
+// WKWebView doesn't support WebHID, so raw HID access is provided on the Rust side (hidapi)
+// and exposed to the frontend via invoke. Protocol handling stays on the frontend (hid.ts).
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -7,7 +7,7 @@ use hidapi::{HidApi, HidDevice};
 use serde::Serialize;
 use tauri::State;
 
-// VialのキーボードはUSB HIDの usage_page=0xFF60 / usage=0x61 のインターフェースを持つ
+// Vial keyboards expose a USB HID interface with usage_page=0xFF60 / usage=0x61
 const VIAL_USAGE_PAGE: u16 = 0xff60;
 const VIAL_USAGE: u16 = 0x61;
 
@@ -26,8 +26,8 @@ struct HidState {
     next_handle: u32,
 }
 
-// hidapiのHidApi/HidDeviceは生ポインタを持ちSyncではないため、状態全体をMutexで包んで
-// Tauriのmanaged stateにする（同時に触るのは常に1コマンドだけ）
+// hidapi's HidApi/HidDevice hold raw pointers and aren't Sync, so wrap the whole state in a
+// Mutex and make it Tauri managed state (only one command touches it at a time)
 struct HidManager(Mutex<HidState>);
 
 impl HidManager {
@@ -41,7 +41,7 @@ impl HidManager {
     }
 }
 
-// Vial対応(usage_page/usageが一致する)キーボードを列挙する
+// Enumerate Vial-compatible keyboards (matching usage_page/usage)
 #[tauri::command]
 fn hid_list(state: State<HidManager>) -> Result<Vec<DeviceInfo>, String> {
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
@@ -60,7 +60,7 @@ fn hid_list(state: State<HidManager>) -> Result<Vec<DeviceInfo>, String> {
     Ok(devices)
 }
 
-// パス指定でデバイスを開き、以後のコマンドで使うハンドルを返す
+// Open a device by path and return a handle for subsequent commands
 #[tauri::command]
 fn hid_open(state: State<HidManager>, path: String) -> Result<u32, String> {
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
@@ -72,8 +72,8 @@ fn hid_open(state: State<HidManager>, path: String) -> Result<u32, String> {
     Ok(handle)
 }
 
-// 32バイトのレポートを送り、1レポート(32バイト)の応答をタイムアウト付きで待つ。
-// WebHIDの sendReport(0, data) に相当（report id 0 を先頭に付けて書き込む）
+// Send a 32-byte report and wait (with timeout) for a single 32-byte response report.
+// Equivalent to WebHID's sendReport(0, data) (write with report id 0 prefixed)
 #[tauri::command]
 fn hid_command(
     state: State<HidManager>,
@@ -101,7 +101,7 @@ fn hid_command(
     Ok(buf.to_vec())
 }
 
-// ハンドルを閉じてデバイスを解放する（Vial本家が接続できるよう即座に手放す）
+// Close the handle and release the device (release it immediately so official Vial can connect)
 #[tauri::command]
 fn hid_close(state: State<HidManager>, handle: u32) -> Result<(), String> {
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
@@ -109,8 +109,8 @@ fn hid_close(state: State<HidManager>, handle: u32) -> Result<(), String> {
     Ok(())
 }
 
-// OSの保存/開くダイアログ(plugin-dialog)で選んだパスの読み書き。
-// WebのBlobダウンロード/<input>はWKWebViewで使えないため、フロントはTauri時ここへ委譲する
+// Read/write the path chosen via the OS save/open dialog (plugin-dialog).
+// Web's Blob download/<input> don't work in WKWebView, so the frontend delegates here under Tauri
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
@@ -121,7 +121,7 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
     std::fs::write(&path, contents).map_err(|e| e.to_string())
 }
 
-// macOS デスクトップ専用（iOS/Android は対象外）
+// macOS desktop only (iOS/Android not supported)
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())

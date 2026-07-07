@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "コアの既定権限。HID・ファイル読み書きはアプリ独自コマンドなので追加権限は不要。保存/開くダイアログのみplugin-dialogの権限が要る",
+  "description": "Core default permissions. HID and file read/write are app-specific commands so no extra permissions are needed; only the save/open dialogs require the plugin-dialog permission",
   "windows": ["main"],
   "permissions": ["core:default", "dialog:default"]
 }

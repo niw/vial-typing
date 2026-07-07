@@ -1,4 +1,4 @@
-/* タイプライン・出題表示・操作ヒント・次語キュー */
+/* Type line: prompt display, keystroke position, operation hints, next-word queue */
 
 #wordMeta {
   min-height: 44px;
@@ -121,7 +121,7 @@
   text-align: center;
   min-height: 24px;
   margin-top: 10px;
-  padding-top: 13px; /* 指番号バッジがチップの上にはみ出す分の余白 */
+  padding-top: 13px; /* space for the finger-number badge overflowing above the chip */
   font-size: 14px;
   color: var(--dim);
 }

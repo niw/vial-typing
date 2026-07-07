@@ -1,5 +1,5 @@
-// 複数デバイスから1つを選ばせるためのUI橋渡し（Tauriにはネイティブの選択ダイアログが無い）。
-// requestDevicePick()がPromiseを返し、DevicePickerコンポーネントの選択で解決される
+// UI bridge for picking one device out of several (Tauri has no native picker dialog for this).
+// requestDevicePick() returns a Promise that resolves when the DevicePicker component makes a selection.
 import { invalidate } from "./store";
 
 export interface PickerDevice {
@@ -10,7 +10,7 @@ export interface PickerDevice {
 }
 
 export const picker = {
-  devices: null as PickerDevice[] | null, // 表示中(null=非表示)
+  devices: null as PickerDevice[] | null, // shown while non-null (null = hidden)
   resolve: null as ((device: PickerDevice | null) => void) | null,
 };
 

@@ -1,18 +1,18 @@
-// HIDトランスポートの抽象。プロトコル処理(hid.ts)はこのインターフェース越しに動くので、
-// ブラウザ(WebHID)とTauri(Rust hidapi)を実行時に差し替えられる
+// HID transport abstraction. Protocol handling (hid.ts) runs through this interface,
+// so the browser (WebHID) and Tauri (Rust hidapi) implementations can be swapped at runtime
 import { isTauri } from "./platform";
 
 export interface HidConnection {
-  label: string; // ログ・ステータス表示に使うデバイス名
+  label: string; // device name used in log/status display
   vendorId?: number;
   productId?: number;
-  command(bytes: number[], timeoutMs: number): Promise<Uint8Array>; // 32B送信→応答1レポート待ち
+  command(bytes: number[], timeoutMs: number): Promise<Uint8Array>; // send 32B -> wait for one response report
   close(): Promise<void>;
 }
 
 export interface HidTransport {
-  available: boolean; // この環境でHIDが使えるか
-  open(): Promise<HidConnection | null>; // デバイスを選択して接続。キャンセル時はnull
+  available: boolean; // whether HID is usable in this environment
+  open(): Promise<HidConnection | null>; // pick a device and connect; null if cancelled
 }
 
 export async function getHidTransport(): Promise<HidTransport> {

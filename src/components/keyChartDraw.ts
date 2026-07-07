@@ -1,8 +1,8 @@
-// キー別の速度推移グラフの canvas 描画（コンポーネントから呼ばれる）
+// Canvas rendering for the per-key speed-over-time chart (called from the component)
 import { GUIDED_TARGET_TIME, type GuidedKey, guidedWpm } from "../lib/guided";
 
-// キー別の速度推移グラフ (keybrのKeyDetailsChart相当):
-// 走行ごとの速度の散布図 + 平滑速度の曲線 + 目標速度の水平線 + 現在位置の縦線
+// Per-key speed-over-time chart (equivalent to keybr's KeyDetailsChart):
+// per-run speed scatter plot + smoothed-speed curve + target-speed horizontal line + current-position vertical line
 export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
   const cssWidth = canvas.clientWidth;
   const cssHeight = canvas.clientHeight;
@@ -28,12 +28,12 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
   const samples = key.samples.slice(-30);
   const targetWpm = guidedWpm(GUIDED_TARGET_TIME);
 
-  // 目盛りの範囲を決める
+  // Determine the tick range
   let xMax = samples.length;
   let nowX = 0;
   if (samples.length && (key.bestConfidence ?? 0) < 1) {
     nowX = samples.length;
-    xMax = samples.length + 10; // 未習得キーは先の見通し分だけ右に伸ばす
+    xMax = samples.length + 10; // extend right for an unmastered key to leave room for the outlook
   }
   const speeds = samples.flatMap((s) => [12000 / s.timeToType, 12000 / s.filtered]);
   let yMin = Math.min(targetWpm, ...speeds);
@@ -44,7 +44,7 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
   const px = (i: number) => box.x + (xMax > 1 ? ((i - 1) / (xMax - 1)) * box.w : box.w / 2);
   const py = (wpm: number) => box.y + box.h - ((wpm - yMin) / (yMax - yMin)) * box.h;
 
-  // グリッドと軸
+  // Grid and axes
   ctx.lineWidth = 1;
   ctx.strokeStyle = colors.grid;
   ctx.beginPath();
@@ -87,7 +87,7 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
     ctx.fillText(String(Math.round(v)), px(v), box.y + box.h + 6);
   }
 
-  // 目標速度の水平線
+  // Target-speed horizontal line
   const ty = py(targetWpm);
   ctx.strokeStyle = colors.target;
   ctx.beginPath();
@@ -99,7 +99,7 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
   ctx.textBaseline = "middle";
   ctx.fillText("目標 " + targetWpm, box.x + box.w + 10, ty);
 
-  // 現在位置の縦線
+  // Current-position vertical line
   if (nowX > 0) {
     const nx = px(nowX);
     ctx.strokeStyle = colors.axis;
@@ -115,7 +115,7 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
     ctx.fillText("今", nx + 3, box.y - 2);
   }
 
-  // 走行ごとの実測速度の散布図
+  // Per-run measured-speed scatter plot
   ctx.fillStyle = colors.dot;
   samples.forEach((s, i) => {
     ctx.beginPath();
@@ -123,7 +123,7 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
     ctx.fill();
   });
 
-  // 平滑速度の曲線
+  // Smoothed-speed curve
   ctx.strokeStyle = colors.curve;
   ctx.lineWidth = 2;
   ctx.beginPath();

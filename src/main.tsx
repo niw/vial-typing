@@ -1,14 +1,14 @@
-// 共通スタイルを最初に読み込み、各コンポーネントのCSSより先にバンドルされる順序を固定する
+// Load shared styles first, fixing the bundle order ahead of each component's CSS
 import "./styles/base.css";
 import { createRoot } from "react-dom/client";
 import { App } from "./components/App";
 import { guidedLoad, guidedRebuildStats, guidedUpdateKeys } from "./lib/guided";
 import { restoreSavedKeymap } from "./lib/kb";
 
-// 起動処理: 履歴と保存済みキーマップを読み込んでから描画する
+// Startup: load history and the saved keymap before rendering
 guidedLoad();
 guidedRebuildStats();
 guidedUpdateKeys();
-restoreSavedKeymap(); // 前回のレイアウト+キーマップがあれば自動復元
+restoreSavedKeymap(); // auto-restore the previous layout+keymap if present
 
 createRoot(document.getElementById("root")!).render(<App />);

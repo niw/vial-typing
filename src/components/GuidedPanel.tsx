@@ -23,7 +23,7 @@ const COURSES: [CourseId, string][] = [
 ];
 
 export function GuidedPanel() {
-  // 非表示中は描画も導出計算もしない（キーストローク毎の全体再描画に乗るため）
+  // Skip rendering and derived computations while hidden (this rides on the per-keystroke full re-render)
   if (!engine.guided) return null;
   const course = guided.courses[guided.course];
   const letterFocus = guidedFocusOf(course.letters);
@@ -141,7 +141,7 @@ function KeyChart({ guidedKey: key }: { guidedKey: GuidedKey }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     drawKeyChart(canvas, key);
-    // コンテナ幅の変化（サイドバー切替やリサイズ）でも再描画する
+    // Also redraw when the container width changes (sidebar toggle or resize)
     const observer = new ResizeObserver(() => drawKeyChart(canvas, key));
     observer.observe(canvas);
     return () => observer.disconnect();

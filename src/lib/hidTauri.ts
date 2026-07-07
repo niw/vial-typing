@@ -1,5 +1,5 @@
-// Tauri(WKWebViewはWebHID非対応)トランスポート。HIDアクセスはRust側(hidapi)へinvokeで委譲する。
-// このモジュールはisTauri()時のみ動的importされるので、@tauri-apps/apiはwebバンドルに入らない
+// Tauri transport (WKWebView doesn't support WebHID). HID access is delegated to the Rust side (hidapi) via invoke.
+// This module is only dynamically imported when isTauri(), so @tauri-apps/api never ends up in the web bundle
 import { type PickerDevice, requestDevicePick } from "./devicePicker";
 import type { HidConnection, HidTransport } from "./hidTransport";
 
@@ -9,7 +9,7 @@ export const tauriHidTransport: HidTransport = {
     const { invoke } = await import("@tauri-apps/api/core");
     const devices = await invoke<PickerDevice[]>("hid_list");
     if (!devices.length) throw new Error("Vial対応キーボードが見つかりません");
-    // 1台なら即接続、複数なら選択ダイアログを出す（WebのrequestDeviceダイアログの代替）
+    // Connect immediately if there's one device; show a picker dialog for multiple (stand-in for the web requestDevice dialog)
     const picked = devices.length === 1 ? devices[0] : await requestDevicePick(devices);
     if (!picked) return null;
     const handle = await invoke<number>("hid_open", { path: picked.path });

@@ -1,6 +1,6 @@
-// キーコード表とデコード (QMK/Vial数値 + .vil文字列)
+// Keycode tables and decoding (QMK/Vial numeric codes + .vil strings)
 
-// デコード済みキーコード。tで種別を表し、必要なフィールドだけ持つ
+// Decoded keycode. t indicates the kind; only the fields needed for that kind are set
 export interface KeyDef {
   t: string;
   code?: number;
@@ -66,11 +66,11 @@ const HID_CHARS_JIS: Record<number, [string, string]> = {
   0x89: ["\\", "|"], // INT3 ¥
 };
 
-// 現在の配列解釈(US/JIS)でのキーコード→文字。jis=trueでJIS解釈の表を優先する
+// Keycode -> character under the current layout interpretation (US/JIS). jis=true prefers the JIS table
 export function charsOf(code: number, jis: boolean): [string, string] | undefined {
   if (jis) {
     if (code in HID_CHARS_JIS) return HID_CHARS_JIS[code];
-    if (code === 0x35) return undefined; // JIS: 半角/全角 — no character output
+    if (code === 0x35) return undefined; // JIS: Hankaku/Zenkaku — no character output
   }
   return HID_CHARS[code];
 }
@@ -112,7 +112,7 @@ const KEYLABELS: Record<number, string> = {
   0x8a: "変換",
   0x8b: "無変換",
   0x90: "IME ON",
-  0x91: "IME OFF", // LANG1 / LANG2（macOS の かな / 英数）
+  0x91: "IME OFF", // LANG1 / LANG2 (macOS's Kana / Eisu-Alphanumeric keys)
 };
 for (let i = 0; i < 12; i++) KEYLABELS[0x3a + i] = "F" + (i + 1); // F1-F12
 for (let i = 0; i < 12; i++) KEYLABELS[0x68 + i] = "F" + (i + 13); // F13-F24 (HID 0x68-0x73)
@@ -431,8 +431,8 @@ export function legendFor(k: KeyDef, jis: boolean): string {
     case "kc": {
       const ch = charsOf(k.code ?? 0, jis);
       if (ch) {
-        // Shift以外の修飾(Ctrl/Alt/GUI)が付くキーはショートカット扱い:
-        // 全修飾(Shiftを含む) + シフト前のベースキー を表示する (例: LSG(3) -> Sft+GUI+3)
+        // Keys with modifiers other than Shift (Ctrl/Alt/GUI) are treated as shortcuts:
+        // show all modifiers (including Shift) + the base key before shifting (e.g. LSG(3) -> Sft+GUI+3)
         if ((k.mods ?? 0) & 0x0d) {
           const raw = ch[0];
           const baseKey =

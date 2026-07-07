@@ -1,5 +1,5 @@
-// 練習エンジン: 走行のステートマシン。DOMは触らず、状態変更後に invalidate() で
-// Reactへ再描画を通知する（タイプライン・統計・ヒントはすべて状態から導出される）
+// Practice engine: a state machine for a run. Never touches the DOM; after a state change it calls
+// invalidate() to notify React to re-render (the type line, stats, and hints are all derived from state)
 import { audio } from "./audio";
 import { EN_SENTS, EN_WORDS, JP_SENTS, JP_WORDS, SYM_ITEMS } from "./data";
 import { type GuidedStep, guided, guidedBuildPools, guidedRecordRun, guidedUpdateKeys } from "./guided";
@@ -25,14 +25,14 @@ function drawFrom<T>(list: T[], key: string): T {
   return bags[key].pop() as T;
 }
 
-// 出題1件: 英字系は text、日本語は kana を持つ
+// One practice item: English-type items have text, Japanese items have kana
 export interface PracticeItem {
   text?: string;
   kana?: string;
   meta: string;
 }
 
-// 走行終了時の結果（結果ダイアログの表示内容）
+// Result at the end of a run (contents shown in the result dialog)
 export interface RunResult {
   score: number;
   rank: string;
@@ -48,7 +48,7 @@ export interface RunResult {
 
 export const engine = {
   mode: "en",
-  guided: false, // キー習得モード（練習モードと直交する切替）
+  guided: false, // key-mastery mode (a toggle orthogonal to practice mode)
   items: [] as PracticeItem[],
   idx: 0,
   running: false,
@@ -74,11 +74,11 @@ export const engine = {
   counting: false,
   countdown: null as string | number | null, // 3 → 2 → 1 → "GO!"
   countId: 0 as ReturnType<typeof setInterval> | number,
-  notice: null as string | null, // キーボード未読込のまま開始しようとした時の案内
-  result: null as RunResult | null, // 結果ダイアログの内容（null = 非表示）
-  bonusPops: [] as number[], // 表示中の +1s ポップのid
+  notice: null as string | null, // guidance shown when starting without a keyboard loaded
+  result: null as RunResult | null, // contents of the result dialog (null = hidden)
+  bonusPops: [] as number[], // ids of the +1s popups currently shown
   bonusPopSeq: 0,
-  // キー習得モードの打鍵記録
+  // keystroke records for key-mastery mode
   steps: [] as GuidedStep[],
   lastInputAt: 0,
   typoPending: false,
@@ -127,7 +127,7 @@ export const engine = {
     this.missFlash = false;
   },
 
-  // 3-2-1 カウントダウンを表示してから本番開始
+  // show a 3-2-1 countdown, then start the real run
   start() {
     if (this.counting) return;
     if (!KB.layerCount) {
@@ -168,7 +168,7 @@ export const engine = {
   beginRun() {
     clearInterval(this.timerId);
     if (this.guided) {
-      // 最新の習得状況で出題プールを作り直す
+      // rebuild the item pool based on the latest mastery status
       guidedUpdateKeys();
       guided.words = guidedBuildPools();
       bags.g_en = bags.g_jp = bags.g_sym = [];
@@ -205,7 +205,7 @@ export const engine = {
       this.finish();
       return;
     }
-    invalidate(); // 残り時間/WPM表示の更新
+    invalidate(); // update the remaining-time/WPM display
   },
 
   onCorrect() {
@@ -215,7 +215,7 @@ export const engine = {
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
     if (this.combo % COMBO_STEP === 0) {
       if (!isUnlimited()) {
-        // 無制限モードでは時間ボーナスは無意味なので付与しない
+        // time bonuses are meaningless in unlimited mode, so don't award them
         this.endTime += COMBO_BONUS * 1000;
         this.bonusTotal += COMBO_BONUS;
         const id = ++this.bonusPopSeq;
@@ -246,7 +246,7 @@ export const engine = {
       this.text = it.text ?? "";
       this.pos = 0;
     }
-    this.lastInputAt = 0; // 単語間の間隔は打鍵時間に含めない
+    this.lastInputAt = 0; // the gap between words isn't counted as keystroke time
     this.typoPending = false;
   },
 
@@ -267,7 +267,7 @@ export const engine = {
     return o ? o[this.typed.length] : null;
   },
 
-  // 次に打つべき文字（走行中のみ。表示側のヒント導出に使う）
+  // the next character to type (only while running; used to derive the display hint)
   expectedChar(): string | null {
     return this.running && this.items.length ? this.expect() : null;
   },
@@ -292,7 +292,7 @@ export const engine = {
     }
   },
 
-  // 文字の確定1回を1打鍵として記録する。ミスした文字は打鍵時間の集計から除外される
+  // record each confirmed character as one keystroke. Missed characters are excluded from the keystroke-time tally
   recordStep(ch: string) {
     const now = Date.now();
     this.steps.push({ ch, typo: this.typoPending, time: this.lastInputAt ? now - this.lastInputAt : 0 });
@@ -306,7 +306,7 @@ export const engine = {
     const nt = this.typed + c;
     const ok = u.opts.some((o) => o.startsWith(nt));
     if (ok) {
-      if (this.guided) this.recordStep(c); // ローマ字1打鍵として記録
+      if (this.guided) this.recordStep(c); // record as one romaji keystroke
       this.typed = nt;
       this.onCorrect();
       const exact = u.opts.includes(nt);
@@ -379,7 +379,7 @@ export const engine = {
     // Enter skips characters that don't exist in the keymap
     if (!this.items.length) return;
     const ch = this.expect();
-    if (ch != null && findKeyForChar(ch)) return; // 打てる文字はスキップさせない
+    if (ch != null && findKeyForChar(ch)) return; // don't skip characters that can be typed
     if (this.isJP()) {
       this.softDone = false;
       this.finishUnit();

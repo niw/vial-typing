@@ -1,5 +1,5 @@
-// Vial/VIAプロトコルでのキーマップ読み取りと .vil / vial.json の取り込み。
-// HIDの送受信はHidTransport越しに行い、ブラウザ(WebHID)とTauri(Rust)で共通のロジックが動く
+// Reads keymaps via the Vial/VIA protocol and imports .vil / vial.json files.
+// HID I/O goes through HidTransport, so the same logic works across the browser (WebHID) and Tauri (Rust).
 import { engine } from "./engine";
 import { getHidTransport, type HidConnection } from "./hidTransport";
 import { KB, setKeymap } from "./kb";
@@ -30,7 +30,7 @@ export function applyDefinition(def: VialDefinition, label?: string) {
 }
 
 // vial definitions are xz-compressed JSON (RMK & vial-qmk both use the XZ container).
-// デコーダはバンドル済みで、必要になったときだけ動的importで読み込む
+// the decoders are bundled but only loaded via dynamic import when actually needed
 export async function decompressDefinition(buf: Uint8Array): Promise<string> {
   if (buf[0] === 0xfd && buf[1] === 0x37 && buf[2] === 0x7a) {
     // .xz magic
@@ -77,7 +77,7 @@ export async function connectHID() {
   let conn: HidConnection | null = null;
   try {
     conn = await transport.open();
-    if (!conn) return; // デバイス選択をキャンセル
+    if (!conn) return; // device selection was cancelled
     setStatus("", "レイアウト定義を読み取り中…");
     ui.log.length = 0;
     dlog(

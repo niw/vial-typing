@@ -6,7 +6,7 @@ import { K_NONE, legendFor, shiftedSub } from "../lib/keycodes";
 import { settings } from "../lib/settings";
 import { invalidate, ui } from "../lib/store";
 
-// 静的なJSXは毎描画での再生成を避けるためモジュールレベルへ
+// Static JSX lives at module level to avoid recreating it on every render
 const colorLegend = (
   <div className="legend">
     <span>
@@ -84,7 +84,7 @@ export function KeyboardPanel() {
   );
 }
 
-// 案内対象キーのハイライト種別と押し順（旧paintHint相当の導出）
+// Highlight class and press order for the hint key (derived, equivalent to the old paintHint)
 function highlightMap(hint: Hint | null) {
   const map = new Map<string, { cls: string; order: number }>();
   if (!hint) return map;
@@ -121,8 +121,8 @@ function Keyboard() {
 
   const { hint } = currentExpected();
   const jis = settings.outMode === "jis";
-  // キー盤はタイマーtick毎の全体再描画では変わらないので、入力(hint)や
-  // キーマップ・レイヤー・幅が変わったときだけ組み立て直す
+  // The keyboard doesn't change on every timer-tick re-render, so only rebuild it
+  // when the input (hint), keymap, layer, or width changes
   const board = useMemo(() => {
     if (!KB.layerCount) return placeholder;
 
@@ -137,7 +137,7 @@ function Keyboard() {
       minY = Math.min(minY, k.y);
     }
     const pad = 0.25;
-    // キーボード全体がコンテナ幅に収まるようユニット(--u)を動的計算（最大52px）
+    // Dynamically compute the unit (--u) so the whole keyboard fits the container width (max 52px)
     const spanX = maxX - minX + pad * 2 || 1;
     const U = Math.max(14, Math.min(52, avail / spanX));
     const gap = 3;
@@ -203,7 +203,7 @@ function Keyboard() {
         })}
       </div>
     );
-    // KBはミュータブルだが、layers/physKeys/layerCountは差し替え時に参照ごと変わる
+    // KB is mutable, but layers/physKeys/layerCount get a new reference whenever they're replaced
   }, [hint, jis, avail, KB.physKeys, KB.layers, KB.layerCount, KB.viewLayer]);
 
   return (

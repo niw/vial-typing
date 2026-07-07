@@ -1,6 +1,6 @@
-// 現在の状態（キーマップ・練習記録・設定）をファイルへ書き出し／読み戻す。
-// localStorageはオリジンごとに分離される（web版とTauri版・別ブラウザで非共有）ため、
-// 端末やブラウザをまたいで状態を移すバックアップ手段として使う
+// Writes the current state (keymap, practice records, settings) to a file and reads it back.
+// Since localStorage is isolated per origin (not shared between the web and Tauri builds, or across browsers),
+// this serves as a backup mechanism for moving state across devices/browsers
 import { engine } from "./engine";
 import { openTextFileTauri, saveTextFile } from "./fileDialog";
 import { guided, guidedImport, guidedRefreshJpCourse, guidedResultsSnapshot } from "./guided";
@@ -32,16 +32,16 @@ function parseBackup(text: string): BackupFile | null {
   }
 }
 
-// 将来の形式変更に備え、読み込んだバックアップを現行バージョンへ移行する。
-// 未知の新しいバージョンは取り込まない（古い版のアプリで壊れた復元をしないため）
+// Migrates a loaded backup to the current version, in case the format changes later.
+// Unknown newer versions are rejected (to avoid a broken restore on an older app version)
 function migrateBackup(data: BackupFile): BackupFile | null {
-  const version = typeof data.version === "number" ? data.version : 1; // version未指定は初期形式(1)扱い
+  const version = typeof data.version === "number" ? data.version : 1; // missing version is treated as the initial format (1)
   if (version > BACKUP_VERSION) return null;
-  // 形式が変わったらここでversionを見て段階的に変換する（例: if (version < 2) { ...; data.version = 2; }）
+  // When the format changes, branch on version here for stepwise conversion (e.g. if (version < 2) { ...; data.version = 2; })
   return data;
 }
 
-// 現在の状態をJSON文字列にまとめる
+// Collects the current state into a JSON string
 export function exportBackup(): string {
   const results = guidedResultsSnapshot();
   const backup: BackupFile = {
@@ -56,7 +56,7 @@ export function exportBackup(): string {
   return JSON.stringify(backup);
 }
 
-// ダウンロードファイル名: vial-typing-<キーボード名>-YYYYMMDD.json
+// Download file name: vial-typing-<keyboard name>-YYYYMMDD.json
 function backupFileName(): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -68,13 +68,13 @@ function backupFileName(): string {
   return [BACKUP_APP, name, date].filter(Boolean).join("-") + ".json";
 }
 
-// 現在の状態をファイルに保存する（ブラウザはダウンロード、TauriはOS保存ダイアログ）
+// Saves the current state to a file (browser: download, Tauri: OS save dialog)
 export async function saveBackup(): Promise<void> {
   const saved = await saveTextFile(backupFileName(), exportBackup());
   if (saved) setStatus("ok", "✓ 現在の状態をファイルに保存しました");
 }
 
-// バックアップファイルの内容を取り込む（復元は現在のキーマップと練習記録を置き換える）
+// Imports the contents of a backup file (restoring replaces the current keymap and practice records)
 export function importBackup(text: string): boolean {
   const raw = parseBackup(text);
   if (!raw) {
@@ -86,16 +86,16 @@ export function importBackup(text: string): boolean {
     setStatus("err", "このバックアップは新しいバージョンのVial Typingのものです。アプリを更新してください");
     return false;
   }
-  // 練習記録を置き換えて既存の記録が消えるときだけ確認する（誤操作での消失防止）
+  // Only confirm when replacing practice records would erase existing ones (guards against accidental loss)
   const willReplaceRecords = !!(data.guided && Array.isArray(data.guided.results));
   if (willReplaceRecords && guided.results.length) {
     if (!confirm("現在の練習記録を、ファイルの内容で置き換えます。よろしいですか？")) return false;
   }
   const restored: string[] = [];
-  // 設定を先に反映する: レイヤー固定などをキーマップ適用時のレイヤー数チェックに乗せるため
+  // Apply settings first: so things like layer pinning are covered by the layer-count check when the keymap is applied
   if (data.settings && typeof data.settings === "object") {
     settingsImport(data.settings);
-    // 設定変更に伴う再計算: キー案内キャッシュ破棄・ローマ字表更新・日本語コース再構築
+    // Recalculation triggered by the settings change: drop the key-hint cache, refresh the romaji table, rebuild the Japanese course
     charCache.clear();
     applyRomajiStyle(settings.romajiStyle);
     guidedRefreshJpCourse();
@@ -110,20 +110,20 @@ export function importBackup(text: string): boolean {
     setStatus("err", "取り込める状態がバックアップにありませんでした");
     return false;
   }
-  engine.idle(); // 新しいキーマップ・設定を反映して走行を仕切り直す
-  // 表示は適用順に依らず一定の並びにする
+  engine.idle(); // reset the run to reflect the new keymap/settings
+  // Keep the display order stable regardless of application order
   const label = ["キーマップ", "練習記録", "設定"].filter((part) => restored.includes(part)).join("・");
   setStatus("ok", "✓ " + label + "を復元しました");
   return true;
 }
 
-// ドロップ/ファイル選択の振り分け: バックアップなら復元、それ以外は .vil / vial.json として読む
+// Dispatch for a dropped/selected file: restore if it's a backup, otherwise read it as .vil / vial.json
 export function loadFileText(text: string, name: string) {
   if (parseBackup(text)) importBackup(text);
   else loadVilText(text, name);
 }
 
-// Tauri: OSの開くダイアログでファイルを選んで復元する（ブラウザは<input type=file>を使う）
+// Tauri: pick a file via the OS open dialog and restore it (the browser uses <input type=file>)
 export async function openBackupDialog(): Promise<void> {
   const file = await openTextFileTauri();
   if (file) loadFileText(file.text, file.name);

@@ -1,6 +1,6 @@
-// 物理レイアウト: KLE(Keyboard Layout Editor)データの型とパーサ
+// Physical layout: types and parser for KLE (Keyboard Layout Editor) data
 
-// 物理キー1個分の配置（KLE由来。x/y/w/hはキーユニット単位、rは回転角）
+// Placement of one physical key (from KLE; x/y/w/h in key units, r is rotation angle)
 export interface PhysKey {
   row: number;
   col: number;
@@ -13,10 +13,10 @@ export interface PhysKey {
   ry: number;
 }
 
-// KLEの1要素: メタオブジェクトか "row,col" ラベル文字列
+// One KLE element: either a meta object or a "row,col" label string
 export type KleItem = { [k: string]: number | boolean | undefined } | string;
 
-// vial.json形式のレイアウト定義
+// Layout definition in vial.json format
 export interface VialDefinition {
   name?: string;
   matrix?: { rows: number; cols: number };

@@ -136,7 +136,7 @@ export function Toolbar() {
                 saveSetting("cornixRomaji", settings.romajiStyle);
                 applyRomajiStyle(settings.romajiStyle);
                 guidedRefreshJpCourse();
-                engine.idle(); // 走行中の単語は古い綴りのままなので仕切り直す
+                engine.idle(); // reset the run since its words are stuck with the old spelling
               }}
             >
               <option value="hepburn">ヘボン式</option>
@@ -171,7 +171,7 @@ function setGuided(on: boolean) {
 function setMode(mode: string) {
   engine.mode = mode;
   if (mode !== "mix" && guided.course !== mode) {
-    // 練習モードに対応するコース表示へ自動で切り替える
+    // Auto-switch the displayed course to match the practice mode
     guided.course = mode as CourseId;
     guided.selected = null;
   }

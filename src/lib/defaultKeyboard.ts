@@ -1,5 +1,5 @@
-// 既定のキーボード: キーマップ未読込時に表示する標準USテンキーレス(60%)配列。
-// 実機を接続しなくてもすぐ練習を始められるようにする（読み取り/ドロップで置き換え可能）
+// Default keyboard: standard US tenkeyless (60%) layout shown before a keymap is loaded.
+// Lets practice start right away without connecting real hardware (replaceable via read/drop)
 import { K_NONE, type KeyDef } from "./keycodes";
 import type { PhysKey } from "./layout";
 
@@ -11,8 +11,8 @@ interface KeySpec {
   w?: number;
 }
 
-// 標準的な61キー US ANSI(60%)配列。分割キーボードではないため、
-// row/col はマトリクスの電気的な意味を持たず、単なる位置識別子として使う
+// Standard 61-key US ANSI (60%) layout. Since this isn't a split keyboard,
+// row/col carry no electrical matrix meaning — they're just position identifiers
 const ROW_SPECS: KeySpec[][] = [
   [
     { code: 0x35 },

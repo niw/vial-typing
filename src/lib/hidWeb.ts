@@ -1,7 +1,7 @@
-// WebHID(Chrome/Edge)トランスポート。requestDeviceのネイティブダイアログでデバイスを選ぶ
+// WebHID (Chrome/Edge) transport. Device selection uses requestDevice's native dialog
 import type { HidConnection, HidTransport } from "./hidTransport";
 
-// Vialのraw HIDインターフェース(usagePage 0xFF60 / usage 0x61)に応答を送って1レポート待つ
+// Send to Vial's raw HID interface (usagePage 0xFF60 / usage 0x61) and wait for one report in response
 function command(dev: HIDDevice, bytes: number[], timeoutMs: number): Promise<Uint8Array> {
   const data = new Uint8Array(32);
   data.set(bytes);
@@ -30,7 +30,7 @@ export const webHidTransport: HidTransport = {
     const devs = await navigator.hid.requestDevice({
       filters: [{ usagePage: 0xff60, usage: 0x61 }],
     });
-    if (!devs.length) return null; // ダイアログをキャンセル
+    if (!devs.length) return null; // dialog was canceled
     const dev = devs.find((d) => d.collections.some((c) => c.usagePage === 0xff60)) || devs[0];
     if (!dev.opened) await dev.open();
     return {

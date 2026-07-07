@@ -1,5 +1,5 @@
-// アプリ全体の再描画通知。状態はモジュール別の可変オブジェクトに持ち、
-// 変更後に invalidate() を呼ぶと購読中のReactコンポーネントが再描画される
+// App-wide redraw notification. State lives in per-module mutable objects;
+// calling invalidate() after a change re-renders subscribed React components
 import { DEFAULT_STATUS_TEXT } from "./defaultKeyboard";
 
 type Listener = () => void;
@@ -23,7 +23,7 @@ export function getVersion() {
   return version;
 }
 
-// 画面共通のUI状態（ステータスピル・読み取りログ・ドロップ表示）
+// Shared UI state (status pill, read log, drop overlay visibility)
 export const ui = {
   status: { cls: "", text: DEFAULT_STATUS_TEXT },
   log: [] as string[],

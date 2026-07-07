@@ -1,4 +1,4 @@
-/* 結果ダイアログ */
+/* Result dialog */
 
 dialog {
   margin: auto; /* the global `* { margin:0 }` reset broke <dialog> centering — restore it */

@@ -4,7 +4,7 @@ import { currentExpected } from "../lib/hint";
 import { FINGER_NAMES, fingerFor, type Hint, type KeyPos } from "../lib/kb";
 import { dispChar } from "../lib/keycodes";
 
-// タイプライン一式: 出題表示・打鍵位置・操作ヒント・次語キュー
+// The type-line bundle: prompt display, cursor position, input hints, and the next-word queue
 export function TypePanel() {
   const jp = engine.running && engine.isJP();
   const item = engine.items[engine.idx];
@@ -18,7 +18,7 @@ export function TypePanel() {
   );
 }
 
-// 待機中の案内は静的なのでモジュールレベルで一度だけ生成する
+// The idle-state prompt is static, so build it once at module level
 const startPrompt = (
   <>
     <span className="start-prompt">▶ スタート</span>
@@ -60,8 +60,8 @@ function TypeLine() {
     );
   }
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: キーボード操作はdocumentのkeydown(Space/Enter)が担う
-    // biome-ignore lint/a11y/noStaticElementInteractions: 同上
+    // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard interaction is handled by document's keydown (Space/Enter)
+    // biome-ignore lint/a11y/noStaticElementInteractions: same as above
     <div
       id="typeline"
       className={idle ? "mono idle" : "mono"}
@@ -74,7 +74,7 @@ function TypeLine() {
   );
 }
 
-// ピアノ運指風の指番号バッジ（チップの上に重ねる）
+// A piano-fingering-style finger-number badge (overlaid on the chip)
 function FingerBadge({ pos }: { pos: KeyPos | null }) {
   const finger = pos && fingerFor(pos.r, pos.c);
   if (!finger) return null;

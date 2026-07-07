@@ -1,3 +1,3 @@
-// 実行環境の判定。Tauri(WKWebView)内かどうかを __TAURI_INTERNALS__ の有無で見る。
-// これを見てTauri専用モジュールを動的importするので、webバンドルには@tauri-apps/*が入らない
+// Detects the runtime environment: whether we're inside Tauri (WKWebView) by checking for __TAURI_INTERNALS__.
+// Tauri-only modules are dynamically imported based on this, so @tauri-apps/* never lands in the web bundle.
 export const isTauri = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;

@@ -1,4 +1,4 @@
-// ローマ字エンジン: かな→ローマ字候補の表と入力単位への分解
+// Romaji engine: kana -> romaji candidate tables, and tokenizing into input units
 
 import type { RomajiStyle } from "./settings";
 import { settings } from "./settings";
@@ -116,8 +116,8 @@ export const ROMAJI: Record<string, string[]> = {
     for (const [sm, v] of Object.entries(V)) ROMAJI[k + sm] = pres.map((p) => p + v);
 })();
 
-// ローマ字の案内表記スタイル。第1候補(=案内に使う綴り)を並べ替えるだけで、
-// どちらのスタイルの綴りでも入力自体は常に受け付ける
+// Romaji hint display style. Only reorders the first candidate (= the spelling shown as the hint);
+// input always accepts either style's spelling regardless
 const ROMAJI_STYLE_PREFS = {
   hepburn: {
     し: "shi",

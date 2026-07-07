@@ -8,7 +8,7 @@ export function StatBar() {
   let low = false;
   if (engine.running) {
     if (unlimited) {
-      // 経過時間をカウントアップ、自動終了しない
+      // Count up elapsed time; does not auto-end
       timeText = ((Date.now() - engine.startTime) / 1000).toFixed(1);
     } else {
       const rem = Math.max(0, engine.endTime - Date.now());

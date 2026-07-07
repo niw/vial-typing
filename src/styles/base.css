@@ -1,4 +1,4 @@
-/* 全体共通: テーマ変数・リセット・ページ骨格・ボタン共通・ドロップオーバレイ */
+/* Global shared: theme variables, reset, page skeleton, common buttons, drop overlay */
 
 :root {
   --bg: #fff8f3;
@@ -24,7 +24,7 @@
   padding: 0;
 }
 
-/* Reactのマウント先。bodyのflexレイアウトに子要素を直接参加させる */
+/* React's mount point. Lets its children participate directly in body's flex layout */
 #root {
   display: contents;
 }

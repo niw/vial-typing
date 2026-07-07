@@ -1,10 +1,10 @@
-// テキストファイルの保存/読み込み。ブラウザはBlobダウンロードと<input type=file>、
-// TauriはOSネイティブの保存/開くダイアログ(plugin-dialog)を使う。
-// WKWebViewはBlobダウンロード非対応なので、Tauri時はネイティブダイアログへ差し替える。
-// Tauri実装は動的importなので、webバンドルに@tauri-apps/*は入らない
+// Save/load text files. In the browser this uses a Blob download and <input type=file>;
+// Tauri uses the OS's native save/open dialogs (plugin-dialog).
+// WKWebView doesn't support Blob downloads, so under Tauri we swap in the native dialogs instead.
+// The Tauri implementation is a dynamic import, so @tauri-apps/* never ends up in the web bundle
 import { isTauri } from "./platform";
 
-// 内容をファイルに書き出す。保存したらtrue、キャンセルでfalse
+// Write contents out to a file. Returns true if saved, false if canceled
 export async function saveTextFile(defaultName: string, contents: string): Promise<boolean> {
   if (isTauri()) {
     const { tauriSaveTextFile } = await import("./fileDialogTauri");
@@ -22,8 +22,8 @@ export async function saveTextFile(defaultName: string, contents: string): Promi
   return true;
 }
 
-// OSの開くダイアログでファイルを選び内容を返す(Tauri専用。キャンセルでnull)。
-// ブラウザは<input type=file>を使うのでこの関数は呼ばない
+// Pick a file via the OS's open dialog and return its contents (Tauri only; null if canceled).
+// The browser uses <input type=file> instead, so this function is never called there
 export async function openTextFileTauri(): Promise<{ name: string; text: string } | null> {
   const { tauriOpenTextFile } = await import("./fileDialogTauri");
   return tauriOpenTextFile();

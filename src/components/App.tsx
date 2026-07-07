@@ -18,8 +18,8 @@ import { useAppState } from "./useApp";
 export function App() {
   useAppState();
 
-  // 案内対象キーのレイヤーへ表示を自動で切り替える（旧refreshHintの副作用）。
-  // 打鍵ごとに再評価し、レイヤータブの手動切替では発火させない
+  // Auto-switch the displayed layer to the hint key's layer (side effect of the old refreshHint).
+  // Re-evaluated on every keystroke; does not fire from manual layer-tab switches
   const { hint } = currentExpected();
   const strokes = engine.correct + engine.miss;
   useEffect(() => {
@@ -29,16 +29,16 @@ export function App() {
     }
   }, [hint, strokes]);
 
-  // グローバル入力: キー入力・ファイルドロップ
+  // Global input: keystrokes and file drops
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (engine.result) return; // 結果ダイアログはネイティブのEscで閉じる
+      if (engine.result) return; // the result dialog closes via the native Esc handler
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === "Escape") {
         // Esc during a run/countdown = back to the pre-start menu
         if (engine.running && isUnlimited()) {
           e.preventDefault();
-          engine.finish(); // 無制限は結果を表示して終了
+          engine.finish(); // unlimited mode shows the result and ends
         } else if (engine.running || engine.counting) {
           e.preventDefault();
           engine.idle();

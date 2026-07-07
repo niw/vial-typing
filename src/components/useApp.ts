@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { getVersion, subscribe } from "../lib/store";
 
-// ストアの invalidate() で再描画するためのフック（Appが購読し、ツリー全体を再描画する）
+// Hook that re-renders on the store's invalidate() (App subscribes to it and re-renders the whole tree)
 export function useAppState() {
   return useSyncExternalStore(subscribe, getVersion);
 }

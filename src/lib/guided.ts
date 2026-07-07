@@ -1,19 +1,19 @@
-// キー習得モード (keybr.com方式のキー解放) の統計・解放判定・出題プール
+// Key-acquisition mode (keybr.com-style key unlocking): stats, unlock decisions, and word pools
 import { EN_SENTS, EN_WORDS, JP_WORDS, SYM_ITEMS } from "./data";
 import { ROMAJI, tokenizeKana } from "./romaji";
 import { invalidate } from "./store";
 
-// keybr.comのguided lessonの移植: 1走行を1レッスンとしてキー別の平均打鍵時間を記録し、
-// 指数平滑した速度が目標に達すると出現頻度順に次のキーを解放して出題単語を更新する
-export const GUIDED_TARGET_TIME = 60000 / 175; // 目標速度175CPM(=35WPM)での1打鍵あたりの時間(ms)
+// A port of keybr.com's guided lesson: treats each run as one lesson, recording the average time-to-type per key.
+// Once the exponentially smoothed speed reaches the target, the next key unlocks in frequency order and the word pool updates.
+export const GUIDED_TARGET_TIME = 60000 / 175; // time per keystroke (ms) at the target speed of 175 CPM (=35 WPM)
 const GUIDED_MIN_KEYS = 6;
-const GUIDED_ALPHA = 0.1; // 指数平滑の係数
+const GUIDED_ALPHA = 0.1; // exponential smoothing coefficient
 const GUIDED_MAX_RESULTS = 300;
 export const GUIDED_STORE_KEY = "vialTypingGuided";
 const GUIDED_SLOW_COLOR = [0xcc, 0x00, 0x00];
 const GUIDED_FAST_COLOR = [0x60, 0xd7, 0x88];
 
-// コーパス中の出現頻度順に文字を並べる (keybrのLetter.frequencyOrder相当。出現しない文字は含めない)
+// order characters by frequency of occurrence in the corpus (equivalent to keybr's Letter.frequencyOrder; characters that never occur are excluded)
 function guidedFrequencyOrder(texts: string[], accept: (ch: string) => boolean): string[] {
   const freq = new Map<string, number>();
   for (const text of texts) {
@@ -27,9 +27,9 @@ function guidedFrequencyOrder(texts: string[], accept: (ch: string) => boolean):
 }
 
 const guidedIsLetter = (ch: string) => ch >= "a" && ch <= "z";
-const guidedIsSymbol = (ch: string) => ch !== " " && !guidedIsLetter(ch); // 記号と数字（大文字は小文字化済み）
+const guidedIsSymbol = (ch: string) => ch !== " " && !guidedIsLetter(ch); // symbols and digits (uppercase letters are already lowercased)
 
-// 練習モード別のコース: 対象キーとそのコーパスでの解放順。打鍵統計はコース間で共有する
+// Courses per practice mode: the target keys and their unlock order within that corpus. Keystroke stats are shared across courses.
 interface GuidedCourseOrder {
   letters: string[];
   symbols?: string[];
@@ -48,12 +48,12 @@ const GUIDED_COURSES: Record<"en" | "jp" | "sym", GuidedCourseOrder> = {
   },
 };
 
-// 統計を追跡する全キー（全コースの英字と記号の和集合）
+// all keys tracked for stats (union of the letters and symbols across all courses)
 const GUIDED_TRACKED = [
   ...new Set(Object.values(GUIDED_COURSES).flatMap((course) => [...course.letters, ...(course.symbols || [])])),
 ];
 
-// 1走行分の記録。h は 文字 -> [打鍵数, ミス数, 平均打鍵時間ms]
+// A single run's record. h maps char -> [keystroke count, miss count, average time-to-type ms]
 export interface GuidedResult {
   t: number;
   h: Record<string, [number, number, number]>;
@@ -68,7 +68,7 @@ export interface GuidedStat {
   timeToType: number | null;
   bestTimeToType: number | null;
 }
-// トラック上の1キー分の解放状態
+// unlock state of a single key on a track
 export interface GuidedKey extends GuidedStat {
   ch: string;
   confidence: number | null;
@@ -80,7 +80,7 @@ export interface GuidedCourse {
   letters: GuidedKey[];
   symbols?: GuidedKey[];
 }
-// 走行中の1打鍵分の記録
+// record of a single keystroke during a run
 export interface GuidedStep {
   ch: string;
   typo: boolean;
@@ -91,11 +91,11 @@ export type CourseId = "en" | "jp" | "sym";
 export const guided = {
   results: [] as GuidedResult[],
   stats: new Map<string, GuidedStat>(),
-  courses: {} as Record<CourseId, GuidedCourse>, // コースごとの解放状態
-  course: "en" as CourseId, // パネルに表示中のコース
-  words: { en: [] as string[], jp: [] as [string, string][], sym: [] as string[] }, // 練習モード別の出題プール
+  courses: {} as Record<CourseId, GuidedCourse>, // unlock state per course
+  course: "en" as CourseId, // the course currently shown in the panel
+  words: { en: [] as string[], jp: [] as [string, string][], sym: [] as string[] }, // word pools per practice mode
   selected: null as string | null,
-  rev: 0, // 記録・リセットで増える(グラフ再描画のトリガ)
+  rev: 0, // bumped on record/reset (triggers a graph redraw)
 };
 
 export function guidedLoad() {
@@ -111,10 +111,10 @@ function guidedSave() {
   } catch {}
 }
 
-// 信頼度 = 目標打鍵時間 / 実際の打鍵時間。1.0以上で「習得済み」(keybrのTarget.confidence相当)
+// confidence = target time-to-type / actual time-to-type. 1.0 or above means "mastered" (equivalent to keybr's Target.confidence)
 const guidedConfidence = (timeToType: number | null) => (timeToType == null ? null : GUIDED_TARGET_TIME / timeToType);
 
-// 全記録からキー別の平滑打鍵時間と自己ベストを再計算する (keybrのMutableKeyStats相当)
+// recompute each key's smoothed time-to-type and personal best from all records (equivalent to keybr's MutableKeyStats)
 export function guidedRebuildStats() {
   const stats = new Map<string, GuidedStat>(
     GUIDED_TRACKED.map((ch) => [ch, { samples: [], timeToType: null, bestTimeToType: null }]),
@@ -134,7 +134,7 @@ export function guidedRebuildStats() {
   guided.stats = stats;
 }
 
-// 1トラック分の解放済みキーと注目キーを決める (keybrのGuidedLesson.update相当)
+// determine the unlocked keys and focus key for one track (equivalent to keybr's GuidedLesson.update)
 function guidedTrackKeys(order: string[]): GuidedKey[] {
   const keys = order.map((ch): GuidedKey => {
     const stat = guided.stats.get(ch)!;
@@ -152,14 +152,14 @@ function guidedTrackKeys(order: string[]): GuidedKey[] {
   for (const key of keys) {
     const included = keys.filter((k) => k.included);
     if (included.length < GUIDED_MIN_KEYS) {
-      key.included = true; // 最低限のキー数を確保
+      key.included = true; // guarantee a minimum number of keys
     } else if ((key.bestConfidence ?? 0) >= 1) {
-      key.included = true; // 一度でも目標速度に達したキーは常に含める
+      key.included = true; // always include a key that has ever reached the target speed
     } else if (included.every((k) => (k.bestConfidence ?? 0) >= 1)) {
-      key.included = true; // 既存キーがすべて目標に達したときだけ次のキーを解放
+      key.included = true; // only unlock the next key once all existing keys have reached the target
     }
   }
-  // 最も信頼度の低い解放済みキーを注目キーにする
+  // make the unlocked key with the lowest confidence the focus key
   const weakest = keys
     .filter((k) => k.included && (k.bestConfidence ?? 0) < 1)
     .sort((a, b) => (a.bestConfidence ?? 0) - (b.bestConfidence ?? 0));
@@ -167,7 +167,7 @@ function guidedTrackKeys(order: string[]): GuidedKey[] {
   return keys;
 }
 
-// 共有統計から各コースの解放状態を計算する
+// compute each course's unlock state from the shared stats
 export function guidedUpdateKeys() {
   guided.courses = {
     en: { letters: guidedTrackKeys(GUIDED_COURSES.en.letters) },
@@ -182,7 +182,7 @@ export function guidedUpdateKeys() {
 const guidedIncludedSet = (track: GuidedKey[]) => new Set(track.filter((k) => k.included).map((k) => k.ch));
 export const guidedFocusOf = (track: GuidedKey[]) => track.find((k) => k.focused)?.ch ?? null;
 
-// 全コース・全トラックの解放済みキーの和集合（解放アナウンスの差分検出用）
+// union of unlocked keys across all courses/tracks (used to diff for unlock announcements)
 function guidedIncludedAll() {
   const set = new Set<string>();
   for (const course of Object.values(guided.courses))
@@ -191,7 +191,7 @@ function guidedIncludedAll() {
   return set;
 }
 
-// 解放済みキーだけで打てるお題を練習モード別に作る (keybrのDictionary.find相当)
+// build word pools typeable with only unlocked keys, per practice mode (equivalent to keybr's Dictionary.find)
 export function guidedBuildPools() {
   const courses = guided.courses;
   return {
@@ -206,23 +206,23 @@ export function guidedBuildPools() {
   };
 }
 
-// 解放済みキーだけで綴れて注目キーを含む英単語
+// English words spellable with only unlocked keys, containing the focus key
 function guidedEnPool(included: Set<string>, focused: string | null): string[] {
   let words = EN_WORDS.filter((w) => w.length > 2 && [...w].every((ch) => included.has(ch)));
   if (focused) words = words.filter((w) => w.includes(focused));
   words = words.slice(0, 1000);
-  while (words.length < 15) words.push(guidedPseudoWord([...included], focused)); // 実単語が少ない序盤は疑似単語で補う
+  while (words.length < 15) words.push(guidedPseudoWord([...included], focused)); // pad with pseudo-words early on when few real words qualify
   return words;
 }
 
-// 単語の標準ローマ字表記（各入力単位の第1候補をつないだもの）
+// standard romaji spelling of a word (joins the first-choice romanization of each input unit)
 function guidedRomajiOf(kana: string): string {
   return tokenizeKana(kana)
     .map((unit) => unit.opts[0] || "")
     .join("");
 }
 
-// ローマ字スタイル変更後に日本語コースの解放順を再計算する
+// recompute the Japanese course's unlock order after the romaji style changes
 export function guidedRefreshJpCourse() {
   GUIDED_COURSES.jp.letters = guidedFrequencyOrder(
     JP_WORDS.map(([kana]) => guidedRomajiOf(kana)),
@@ -232,7 +232,7 @@ export function guidedRefreshJpCourse() {
   invalidate();
 }
 
-// 標準ローマ字が解放済みキーだけで打てる日本語単語
+// Japanese words whose standard romaji is typeable with only unlocked keys
 function guidedJpPool(included: Set<string>, focused: string | null): [string, string][] {
   const typeable = JP_WORDS.filter(([kana]) => [...guidedRomajiOf(kana)].every((ch) => included.has(ch)));
   let pool = focused ? typeable.filter(([kana]) => guidedRomajiOf(kana).includes(focused)) : typeable;
@@ -242,7 +242,7 @@ function guidedJpPool(included: Set<string>, focused: string | null): [string, s
   return pool;
 }
 
-// 解放済みキーだけで打てるかなを組み合わせた疑似単語（[かな, 表示] 形式）
+// pseudo-word combining kana typeable with only unlocked keys (in [kana, display] form)
 function guidedPseudoKana(included: Set<string>, focused: string | null): [string, string] {
   const kanas = Object.keys(ROMAJI).filter(
     (kana) => !"んっ".includes(kana) && [...ROMAJI[kana][0]].every((ch) => included.has(ch)),
@@ -258,7 +258,7 @@ function guidedPseudoKana(included: Set<string>, focused: string | null): [strin
   return [word, word];
 }
 
-// 英字も記号もそれぞれの解放済みキーに収まる記号行（不足分は識別子+記号で生成）
+// a symbol line where both letters and symbols fit within their own unlocked keys (generated from identifier+symbol when there's a shortfall)
 function guidedSymPool(
   letters: Set<string>,
   letterFocus: string | null,
@@ -278,7 +278,7 @@ function guidedSymPool(
   return pool;
 }
 
-// 解放済みの英字識別子を解放済みの記号でつないだ練習行
+// practice line joining unlocked-letter identifiers with unlocked symbols
 function guidedSymLine(
   letters: Set<string>,
   letterFocus: string | null,
@@ -308,11 +308,11 @@ function guidedPseudoWord(letters: string[], focused: string | null): string {
   return word;
 }
 
-// 1走行分の打鍵記録をキー別ヒストグラムに集計して保存し、新たに解放されたキーを返す
+// aggregate one run's keystroke records into a per-key histogram, save it, and return newly unlocked keys
 export function guidedRecordRun(steps: GuidedStep[]): string[] {
   const byChar = new Map<string, { hit: number; miss: number; time: number; count: number }>();
   for (const step of steps) {
-    const ch = step.ch.toLowerCase(); // Shift打ちの大文字は同じ物理キーとして集計する
+    const ch = step.ch.toLowerCase(); // count a shifted uppercase letter under the same physical key
     if (!guided.stats.has(ch)) continue;
     let s = byChar.get(ch);
     if (!s) byChar.set(ch, (s = { hit: 0, miss: 0, time: 0, count: 0 }));
@@ -326,10 +326,10 @@ export function guidedRecordRun(steps: GuidedStep[]): string[] {
   const histogram: Record<string, [number, number, number]> = {};
   for (const [ch, s] of byChar) {
     const timeToType = s.count > 0 ? Math.round(s.time / s.count) : 0;
-    if (timeToType > 0 && (timeToType < 40 || timeToType > 12000)) continue; // 速すぎ/遅すぎは無効 (keybrのvalidateSample)
+    if (timeToType > 0 && (timeToType < 40 || timeToType > 12000)) continue; // discard implausibly fast/slow samples (keybr's validateSample)
     histogram[ch] = [s.hit, s.miss, timeToType];
   }
-  if (Object.keys(histogram).length < 3) return []; // 文字種が少なすぎる走行は記録しない
+  if (Object.keys(histogram).length < 3) return []; // don't record a run with too few distinct characters
   const before = guidedIncludedAll();
   guided.results.push({ t: Date.now(), h: histogram });
   if (guided.results.length > GUIDED_MAX_RESULTS) guided.results.splice(0, guided.results.length - GUIDED_MAX_RESULTS);
@@ -349,7 +349,7 @@ export function guidedKeyColor(confidence: number): string {
   return "rgb(" + mix.join(",") + ")";
 }
 
-// 表示中コースのトラック一覧（記号コースは英字+記号の2トラック）
+// tracks for the currently shown course (the symbol course has 2 tracks: letters + symbols)
 export function guidedCourseTracks() {
   const course = guided.courses[guided.course];
   return course.symbols ? [course.letters, course.symbols] : [course.letters];
@@ -360,7 +360,7 @@ export function guidedSelectedKey() {
   return all.find((k) => k.ch === guided.selected) ?? all.find((k) => k.focused) ?? all[0];
 }
 
-// 直近サンプルの回帰直線の傾き = 学習率(WPM/走行) (keybrのLearningRateの簡易版)
+// slope of the regression line over recent samples = learning rate (WPM/run) (a simplified version of keybr's LearningRate)
 export function guidedLearningRate(key: GuidedKey): number | null {
   const samples = key.samples.slice(-30);
   if (samples.length < 5) return null;
@@ -380,12 +380,12 @@ export function guidedLearningRate(key: GuidedKey): number | null {
   return d ? (n * sxy - sx * sy) / d : null;
 }
 
-// 練習記録（走行履歴）をファイル保存用に取り出す
+// extract the practice records (run history) for saving to a file
 export function guidedResultsSnapshot(): GuidedResult[] {
   return guided.results;
 }
 
-// ファイルから読み込んだ走行履歴を取り込み、統計と解放状態を作り直す
+// import run history loaded from a file and rebuild stats and unlock state
 export function guidedImport(results: unknown) {
   const valid = Array.isArray(results)
     ? results.filter(
@@ -401,7 +401,7 @@ export function guidedImport(results: unknown) {
   invalidate();
 }
 
-// 履歴を消して未習得の状態に戻す
+// clear history and revert to the not-yet-mastered state
 export function guidedReset() {
   guided.results = [];
   guided.selected = null;

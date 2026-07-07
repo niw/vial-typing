@@ -1,12 +1,12 @@
-// キーマップ状態と逆引き (文字 → キー+Shift+レイヤー)、指番号の推定
+// Keymap state and reverse lookup (char → key+Shift+layer), plus finger-number estimation
 import { DEFAULT_KEYBOARD, DEFAULT_STATUS_TEXT } from "./defaultKeyboard";
 import { charsOf, K_NONE, type KeyDef, modsHaveShift, tapOf } from "./keycodes";
 import type { PhysKey } from "./layout";
 import { settings } from "./settings";
 import { invalidate, setStatus } from "./store";
 
-// 現在のキーボード: 物理配置(rows/cols/physKeys/name)とキーマップ(layers)、表示中レイヤー。
-// 起動直後は既定のUS配列キーボード(defaultKeyboard.ts)を表示し、実機読み取り/ドロップで置き換える
+// The current keyboard: physical layout (rows/cols/physKeys/name), keymap (layers), and the visible layer.
+// Shows the default US-layout keyboard (defaultKeyboard.ts) right after startup, replaced by reading a real device or a file drop.
 export const KB = {
   rows: DEFAULT_KEYBOARD.rows,
   cols: DEFAULT_KEYBOARD.cols,
@@ -28,7 +28,7 @@ export function setKeymap(layers: KeyDef[][][], source: string, label?: string, 
   KB.label = label || "";
   KB.viewLayer = 0;
   charCache.clear();
-  // レイヤー数が減ったときは無効になった固定レイヤー設定を自動に戻す
+  // reset a fixed-layer preference to auto if it now points past the reduced layer count
   for (const key of ["num", "sym"] as const) {
     if (settings.layerPref[key] !== "auto" && +settings.layerPref[key] >= KB.layerCount)
       settings.layerPref[key] = "auto";
@@ -37,13 +37,13 @@ export function setKeymap(layers: KeyDef[][][], source: string, label?: string, 
     setStatus("", "キーマップ未読込（サンプル表示中）");
   } else {
     setStatus("ok", "✓ " + label + "（" + layers.length + "レイヤー）" + (restored ? " · 前回のキーマップを復元" : ""));
-    // 実際に読み込んだレイアウト+キーマップをブラウザに保存し、次回自動復元する
+    // save the actually loaded layout+keymap to the browser so it auto-restores next time
     if (!restored) saveKeymap(layers, source, label);
   }
   invalidate();
 }
 
-// 直近のレイアウト定義＋キーマップをlocalStorageへ保存
+// save the most recent layout definition + keymap to localStorage
 function saveKeymap(layers: KeyDef[][][], source: string, label?: string) {
   try {
     localStorage.setItem(
@@ -60,12 +60,12 @@ function saveKeymap(layers: KeyDef[][][], source: string, label?: string) {
       }),
     );
   } catch {
-    /* 容量超過/プライベートモード等は無視 */
+    /* ignore quota-exceeded / private-mode errors, etc. */
   }
 }
 
-// 保存済み/ファイル由来のキーマップオブジェクトを現在のキーボードへ適用する。
-// restored=true は起動時の自動復元（保存し直さない）、false はファイル取り込み（保存して次回も復元する）
+// Apply a keymap object (from storage or a file) to the current keyboard.
+// restored=true is the automatic restore at startup (not re-saved); false is a file import (saved so it also restores next time)
 function applyKeymapData(data: unknown, restored: boolean): boolean {
   const d = data as {
     layers?: KeyDef[][][];
@@ -86,7 +86,7 @@ function applyKeymapData(data: unknown, restored: boolean): boolean {
   return true;
 }
 
-// 保存済みレイアウト＋キーマップを復元（成功時true）
+// restore the saved layout + keymap (returns true on success)
 export function restoreSavedKeymap() {
   try {
     const raw = localStorage.getItem(KEYMAP_STORE_KEY);
@@ -96,12 +96,12 @@ export function restoreSavedKeymap() {
   }
 }
 
-// ファイルから読み込んだキーマップを適用する（localStorageにも保存して次回起動時も復元される）
+// apply a keymap loaded from a file (also saved to localStorage so it restores on next launch)
 export function importKeymap(data: unknown): boolean {
   return applyKeymapData(data, false);
 }
 
-// 現在のキーマップをファイル保存用にシリアライズ（既定/サンプル表示中はnull）
+// serialize the current keymap for saving to a file (null while showing the default/sample)
 export function keymapSnapshot() {
   if (!hasSavedKeymap()) return null;
   return {
@@ -116,7 +116,7 @@ export function keymapSnapshot() {
   };
 }
 
-// 保存済みを破棄して既定のUS配列キーボードに戻す
+// discard the saved keymap and revert to the default US-layout keyboard
 export function forgetSavedKeymap() {
   try {
     localStorage.removeItem(KEYMAP_STORE_KEY);
@@ -135,13 +135,13 @@ export function forgetSavedKeymap() {
   invalidate();
 }
 
-// 「キーマップを消す」ボタンは保存済みキーマップがあるときだけ表示。
-// 毎描画でlocalStorageを読まないよう、読込元がsample/default以外(=読込時に保存済み)かで判定する
+// The "clear keymap" button only shows when a saved keymap exists.
+// Determined by whether the source is other than sample/default (i.e. saved on load), so we avoid reading localStorage on every render.
 export function hasSavedKeymap() {
   return KB.source !== "sample" && KB.source !== "default";
 }
 
-// findKeyForChar の結果: 押すキーとホールドすべきキー
+// result of findKeyForChar: the key to press and the key(s) to hold
 export interface KeyPos {
   r: number;
   c: number;
@@ -182,7 +182,7 @@ function physHas(r: number, c: number) {
   return (_physSet as Set<string>).has(r + "," + c);
 }
 
-// 物理配置から指番号を推定する (1=親指, 2=人差し指, 3=中指, 4=薬指, 5=小指)
+// estimate finger number from the physical layout (1=thumb, 2=index, 3=middle, 4=ring, 5=pinky)
 export const FINGER_NAMES: Record<number, string> = { 1: "親指", 2: "人差し指", 3: "中指", 4: "薬指", 5: "小指" };
 let _fingerRef: PhysKey[] | null = null;
 let _fingerMap: Map<string, number> | null = null;
@@ -194,9 +194,10 @@ export function fingerFor(row: number, col: number): number | null {
   return _fingerMap?.get(row + "," + col) ?? null;
 }
 
-// ヒューリスティック: 盤面中央で左右の手に分け、分割型(偶数行数>=6)は各半分の最終行を親指、
-// それ以外は回転キーと横長キー(スペース等)を親指とする。残りは列単位で内側から
-// 人差し指×2列・中指・薬指・以降は小指を割り当て、キー1個だけの列は最寄りの列に合流する
+// Heuristic: split into left/right hands at the board's center. For split boards (even row count >= 6),
+// the last row of each half is the thumb; otherwise, rotated keys and wide keys (space, etc.) are the thumb.
+// The rest are assigned column by column from the inside out: 2 columns for the index finger, then middle,
+// ring, and pinky for the remainder; a column with only one key merges into its nearest neighbor.
 function buildFingerMap() {
   const map = new Map<string, number>();
   if (!KB.physKeys.length) return map;
@@ -204,8 +205,8 @@ function buildFingerMap() {
   const midX = (Math.min(...entries.map((e) => e.cx)) + Math.max(...entries.map((e) => e.cx))) / 2;
   const splitHalves = KB.rows >= 6 && KB.rows % 2 === 0;
   const thumbRows = splitHalves ? [KB.rows / 2 - 1, KB.rows - 1] : [];
-  // 非分割盤: 回転キー、または最下段の幅広キー(スペース等)だけを親指とする。
-  // 最下段以外の幅広キー(Shift/Enter/Backspace等)は親指ではない
+  // Non-split board: only rotated keys, or wide keys in the bottom row (space, etc.), are the thumb.
+  // Wide keys outside the bottom row (Shift/Enter/Backspace, etc.) are not the thumb.
   const maxRow = Math.max(...entries.map((e) => e.k.row));
   const isThumb = (e: { k: PhysKey; cx: number }) =>
     splitHalves ? thumbRows.includes(e.k.row) : e.k.r !== 0 || (e.k.row === maxRow && e.k.w >= 1.75);
@@ -313,7 +314,7 @@ export function findKeyForChar(ch: string): Hint | null {
         if (L > 0 && (raw.t === "trans" || raw.t === "none")) continue;
         const tap = tapOf(raw);
         if (!tap) continue;
-        // Ctrl/Alt/GUI付きのキーはショートカット(例: LSG(4)=Sft+GUI+4)であり文字入力ではない
+        // keys with Ctrl/Alt/GUI are shortcuts (e.g. LSG(4)=Sft+GUI+4), not character input
         if (tap.mods & 0x0d) continue;
         const chars = charsOf(tap.code, settings.outMode === "jis");
         if (!chars) continue;

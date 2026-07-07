@@ -1,16 +1,16 @@
-// ユーザー設定。localStorageから起動時に復元し、変更時は各ハンドラが保存する
+// User settings. Restored from localStorage at startup; each handler saves on change.
 export type RomajiStyle = "hepburn" | "kunrei";
 
 export const settings = {
-  // "us" = US刻印通りの出力解釈, "jis" = JIS刻印通りの出力解釈
+  // "us" = interpret output per US legend, "jis" = interpret output per JIS legend
   outMode: "us" as "us" | "jis",
-  // 入力案内の優先: "auto" = ホールド最少, "shift" = Shift優先, "layer" = レイヤー優先
+  // guidance preference: "auto" = fewest holds, "shift" = prefer Shift, "layer" = prefer layer
   keyPref: "auto" as "auto" | "shift" | "layer",
-  // 数字/記号カテゴリの案内レイヤー固定（"auto" またはレイヤー番号の文字列）
+  // fixed guidance layer for the digit/symbol categories ("auto" or a layer-number string)
   layerPref: { num: "auto", sym: "auto" },
   romajiStyle: "hepburn" as RomajiStyle,
   soundOn: true,
-  // 1走行の長さ(秒)。0 = 無制限(タイムアウトなし)
+  // length of one run (seconds). 0 = unlimited (no timeout)
   runSeconds: 60,
 };
 
@@ -45,7 +45,7 @@ export interface SettingsSnapshot {
   runSeconds: number;
 }
 
-// 現在の設定をファイル保存用に取り出す
+// extract the current settings for saving to a file
 export function settingsSnapshot(): SettingsSnapshot {
   return {
     outMode: settings.outMode,
@@ -57,8 +57,8 @@ export function settingsSnapshot(): SettingsSnapshot {
   };
 }
 
-// 取り込んだ設定を反映して localStorage にも保存する。値ごとに妥当性を検証し、
-// 未知/不正なフィールドは無視して既存値を保つ。再計算などの副作用は呼び出し側が行う
+// Apply imported settings and also save them to localStorage. Each value is validated;
+// unknown/invalid fields are ignored and keep their existing value. Side effects like recomputation are the caller's responsibility.
 export function settingsImport(source: unknown) {
   if (!source || typeof source !== "object") return;
   const s = source as Partial<SettingsSnapshot>;

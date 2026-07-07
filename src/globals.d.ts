@@ -1,4 +1,4 @@
 interface Window {
-  // デバッグ用: 最後に読み取ったレイアウト定義JSON（読み取りログから保存できる）
+  // For debugging: the last layout definition JSON read (can be saved from the read log)
   lastDefJson?: string;
 }
