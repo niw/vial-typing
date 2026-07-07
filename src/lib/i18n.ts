@@ -13,8 +13,14 @@ function detectLocale(): Locale {
   try {
     const saved = localStorage.getItem(LOCALE_STORE_KEY);
     if (saved === "en" || saved === "ja") return saved;
+    // Honor the browser's preference order: return the first supported language, not merely the
+    // first Japanese entry anywhere in the list — ["en", "ja"] must resolve to English.
     const langs = navigator.languages?.length ? navigator.languages : [navigator.language];
-    for (const lang of langs) if (lang?.toLowerCase().startsWith("ja")) return "ja";
+    for (const lang of langs) {
+      const lower = lang?.toLowerCase();
+      if (lower?.startsWith("ja")) return "ja";
+      if (lower?.startsWith("en")) return "en";
+    }
   } catch {}
   return "en";
 }

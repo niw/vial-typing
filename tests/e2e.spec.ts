@@ -374,3 +374,27 @@ test.describe("Japanese browser locale", () => {
     await expect(page.locator("#selLang")).toHaveValue("en");
   });
 });
+
+// navigator.languages is a preference order; the first supported language wins.
+async function fakeLanguages(page: import("@playwright/test").Page, langs: string[]) {
+  await page.addInitScript((languages) => {
+    Object.defineProperty(navigator, "languages", { get: () => languages, configurable: true });
+    Object.defineProperty(navigator, "language", { get: () => languages[0], configurable: true });
+  }, langs);
+}
+
+test.describe("browser language preference order", () => {
+  test("resolves to English when English is preferred over Japanese", async ({ page }) => {
+    await fakeLanguages(page, ["en-US", "ja"]);
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Read from keyboard" })).toBeVisible();
+    await expect(page.locator("#selLang")).toHaveValue("en");
+  });
+
+  test("resolves to Japanese when Japanese is preferred over English", async ({ page }) => {
+    await fakeLanguages(page, ["ja", "en-US"]);
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "キーボードから読み取る" })).toBeVisible();
+    await expect(page.locator("#selLang")).toHaveValue("ja");
+  });
+});
