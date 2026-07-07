@@ -1,5 +1,7 @@
 // WebHID (Chrome/Edge) transport. Device selection uses requestDevice's native dialog
+
 import type { HidConnection, HidTransport } from "./hidTransport";
+import { t } from "./i18n";
 
 // Send to Vial's raw HID interface (usagePage 0xFF60 / usage 0x61) and wait for one report in response
 function command(dev: HIDDevice, bytes: number[], timeoutMs: number): Promise<Uint8Array> {
@@ -8,7 +10,7 @@ function command(dev: HIDDevice, bytes: number[], timeoutMs: number): Promise<Ui
   return new Promise<Uint8Array>((resolve, reject) => {
     const timer = setTimeout(() => {
       dev.removeEventListener("inputreport", onRep);
-      reject(new Error("デバイスからの応答がありません"));
+      reject(new Error(t("device.noResponse")));
     }, timeoutMs);
     const onRep = (e: HIDInputReportEvent) => {
       clearTimeout(timer);
@@ -34,7 +36,7 @@ export const webHidTransport: HidTransport = {
     const dev = devs.find((d) => d.collections.some((c) => c.usagePage === 0xff60)) || devs[0];
     if (!dev.opened) await dev.open();
     return {
-      label: dev.productName || "(名称不明)",
+      label: dev.productName || t("device.unknownName"),
       vendorId: dev.vendorId,
       productId: dev.productId,
       command: (bytes, timeoutMs) => command(dev, bytes, timeoutMs),

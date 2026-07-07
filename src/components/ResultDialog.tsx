@@ -1,6 +1,7 @@
 import "./ResultDialog.css";
 import { useEffect, useRef } from "react";
 import { engine } from "../lib/engine";
+import { t } from "../lib/i18n";
 
 export function ResultDialog() {
   const ref = useRef<HTMLDialogElement>(null);
@@ -20,7 +21,7 @@ export function ResultDialog() {
       }}
     >
       <h2 id="rTitle" style={{ fontSize: "18px", textAlign: "center" }}>
-        {result?.unlimited ? "🎉 おつかれさま！" : "🎉 タイムアップ！"}
+        {result?.unlimited ? t("result.titleDone") : t("result.titleTimeUp")}
       </h2>
       <div className="score-hero">
         <div className="rank" id="rRank">
@@ -31,10 +32,10 @@ export function ResultDialog() {
         </div>
         <div className="unit">pt</div>
       </div>
-      <div className="score-formula">スコア = 正解打鍵×10 ＋ ワード×100 ＋ 最大コンボ×30 − ミス×20</div>
+      <div className="score-formula">{t("result.scoreFormula")}</div>
       <div id="rUnlock" hidden={!result?.unlocked.length}>
         {result?.unlocked.length
-          ? "🔓 新しいキーを解放: " + result.unlocked.map((ch) => ch.toUpperCase()).join(" ")
+          ? t("result.unlock", { keys: result.unlocked.map((ch) => ch.toUpperCase()).join(" ") })
           : ""}
       </div>
       <div className="result-grid">
@@ -44,23 +45,23 @@ export function ResultDialog() {
         </div>
         <div>
           <b id="rAcc">{result?.acc ?? "0%"}</b>
-          <span>正確率</span>
+          <span>{t("result.accuracy")}</span>
         </div>
         <div>
           <b id="rWords">{result?.words ?? 0}</b>
-          <span>入力ワード数</span>
+          <span>{t("result.wordsTyped")}</span>
         </div>
         <div>
           <b id="rCombo">{result?.maxCombo ?? 0}</b>
-          <span>最大コンボ</span>
+          <span>{t("result.maxCombo")}</span>
         </div>
         <div>
           <b id="rMiss">{result?.miss ?? 0}</b>
-          <span>ミス数</span>
+          <span>{t("result.missCount")}</span>
         </div>
         <div>
           <b id="rBonus">+{result?.bonusTotal ?? 0}s</b>
-          <span>獲得ボーナス</span>
+          <span>{t("result.bonusEarned")}</span>
         </div>
       </div>
       <div style={{ textAlign: "center" }}>
@@ -73,11 +74,11 @@ export function ResultDialog() {
             engine.start();
           }}
         >
-          もう一度
+          {t("result.again")}
         </button>
       </div>
       <div style={{ textAlign: "center", fontSize: "12px", color: "var(--dim)", marginTop: "12px" }}>
-        ESCキーでメニューに戻る
+        {t("result.escHint")}
       </div>
     </dialog>
   );

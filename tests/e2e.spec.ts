@@ -52,7 +52,7 @@ test("saves keymap, practice records, and settings to a file, and restores them 
   await expect(page.locator("#status")).toHaveClass(/ok/);
 
   // Set the settings that restore will revert, to values different from the defaults
-  await page.getByRole("button", { name: "30秒" }).click();
+  await page.getByRole("button", { name: "30s" }).click();
   await page.selectOption("#selRomaji", "kunrei");
 
   // Save: capture the written Blob's contents and confirm it contains the version plus the keymap and practice records
@@ -64,7 +64,7 @@ test("saves keymap, practice records, and settings to a file, and restores them 
     };
   });
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "保存" }).click();
+  await page.locator("#btnSave").click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^vial-typing.*\.json$/);
   await expect
@@ -82,15 +82,15 @@ test("saves keymap, practice records, and settings to a file, and restores them 
   // Reset to the default state, then restore from the file
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await expect(page.locator("#status")).toContainText("既定のUS配列キーボード");
-  await expect(page.getByRole("button", { name: "30秒" })).not.toHaveClass(/active/); // settings are also back to default
+  await expect(page.locator("#status")).toContainText("default US keyboard");
+  await expect(page.getByRole("button", { name: "30s" })).not.toHaveClass(/active/); // settings are also back to default
   await expect(page.locator("#selRomaji")).toHaveValue("hepburn");
   await dropFile(page, backupText, "backup.json");
-  await expect(page.locator("#status")).toContainText("復元");
+  await expect(page.locator("#status")).toContainText("Restored");
   await expect(page.locator("#status")).toHaveClass(/ok/);
 
   // Settings are also reflected in the UI
-  await expect(page.getByRole("button", { name: "30秒" })).toHaveClass(/active/);
+  await expect(page.getByRole("button", { name: "30s" })).toHaveClass(/active/);
   await expect(page.locator("#selRomaji")).toHaveValue("kunrei");
 
   // The restored state is also saved to localStorage and persists after reload
@@ -114,7 +114,7 @@ test("does not restore a backup with a newer version", async ({ page }) => {
     JSON.stringify({ app: "vial-typing", kind: "backup", version: 999, keymap: null, guided: null }),
     "future.json",
   );
-  await expect(page.locator("#status")).toContainText("新しいバージョン");
+  await expect(page.locator("#status")).toContainText("newer version");
   await expect(page.locator("#status")).toHaveClass(/err/);
 });
 
@@ -127,28 +127,28 @@ test("loads practice data and shows the start screen", async ({ page }) => {
     errors.push(message.text());
   });
   await page.goto("/");
-  await expect(page.locator("#typeline .start-prompt")).toHaveText("▶ スタート");
+  await expect(page.locator("#typeline .start-prompt")).toHaveText("▶ Start");
   expect(errors).toEqual([]);
 });
 
 test("shows elapsed time in unlimited mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "無制限" }).click();
-  await expect(page.locator("#stTimeLbl")).toHaveText("経過時間");
+  await page.getByRole("button", { name: "Unlimited" }).click();
+  await expect(page.locator("#stTimeLbl")).toHaveText("Elapsed");
   await expect(page.locator("#stTime")).toHaveText("0.0");
 });
 
 test("the selected play time persists after reload", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "30秒" }).click();
+  await page.getByRole("button", { name: "30s" }).click();
   await page.reload();
-  await expect(page.getByRole("button", { name: "30秒" })).toHaveClass(/active/);
+  await expect(page.getByRole("button", { name: "30s" })).toHaveClass(/active/);
   await expect(page.locator("#stTime")).toHaveText("30.0");
 });
 
 test("can start with the default US keyboard even without a loaded keyboard", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("#status")).toContainText("既定のUS配列キーボード");
+  await expect(page.locator("#status")).toContainText("default US keyboard");
   await expect(page.locator("#btnForget")).toBeHidden();
   await page.locator("#typeline").click();
   await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 });
@@ -204,31 +204,31 @@ test("shows finger numbers on the key to press and the hint", async ({ page }) =
 
 test("can select a practice mode even in key-mastery mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
   await expect(page.locator("#guided")).toBeVisible();
-  await page.getByRole("button", { name: "日本語ローマ字" }).click();
+  await page.getByRole("button", { name: "Japanese romaji" }).click();
   await expect(page.locator("#guided")).toBeVisible();
-  await page.getByRole("button", { name: "記号・レイヤー" }).click();
+  await page.getByRole("button", { name: "Symbols & layers" }).click();
   await expect(page.locator("#guided")).toBeVisible();
-  await page.getByRole("button", { name: "通常" }).click();
+  await page.getByRole("button", { name: "Normal" }).click();
   await expect(page.locator("#guided")).toBeHidden();
 });
 
 test("shows the key list and chart in key-mastery mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
   await expect(page.locator("#guided")).toBeVisible();
   await expect(page.locator("#keyset .gkey")).toHaveCount(26);
   await expect(page.locator("#keyset .gkey.locked")).toHaveCount(20);
   await expect(page.locator("#keyset .gkey.focused")).toHaveCount(1);
-  await expect(page.locator("#keyInfo")).toContainText("未計測");
+  await expect(page.locator("#keyInfo")).toContainText("Unmeasured");
   await expect(page.locator("#keyChart")).toBeVisible();
   await expect(page.locator("#btnGuidedReset")).toBeDisabled(); // can't be cleared while there's no history yet
 });
 
 test("unlocks the next key once all existing keys reach the target speed", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
   const baseKeys = await page.locator("#keyset .gkey:not(.locked)").allTextContents();
   expect(baseKeys).toHaveLength(6);
   await page.evaluate((letters) => {
@@ -237,7 +237,7 @@ test("unlocks the next key once all existing keys reach the target speed", async
     localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
   }, baseKeys);
   await page.reload();
-  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
   await expect(page.locator("#keyset .gkey:not(.locked)")).toHaveCount(7);
   await expect(page.locator("#keyset .gkey.focused")).toHaveCount(1);
 });
@@ -250,7 +250,7 @@ test("records keystrokes and colors keys during a key-mastery run", async ({ pag
   }, fakeKeymap());
   await page.reload();
   await expect(page.locator("#status")).toHaveClass(/ok/);
-  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
   await page.locator("#typeline").click();
   await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 }); // waiting for the 3-2-1 countdown
   for (let i = 0; i < 20; i++) {
@@ -273,8 +273,8 @@ test("records keystrokes during a Japanese run in key-mastery mode too", async (
   }, fakeKeymap());
   await page.reload();
   await expect(page.locator("#status")).toHaveClass(/ok/);
-  await page.getByRole("button", { name: "キー習得" }).click();
-  await page.getByRole("button", { name: "日本語ローマ字" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.getByRole("button", { name: "Japanese romaji" }).click();
   await page.locator("#typeline").click();
   await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 });
   for (let i = 0; i < 20; i++) {
@@ -290,12 +290,12 @@ test("records keystrokes during a Japanese run in key-mastery mode too", async (
 
 test("unlock order differs per course, and the symbol course includes symbol keys", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
   const enOrder = await page.locator("#keyset .gkey").allTextContents();
-  await page.getByRole("button", { name: "日本語", exact: true }).click();
+  await page.getByRole("button", { name: "Japanese", exact: true }).click();
   const jpOrder = await page.locator("#keyset .gkey").allTextContents();
   expect(jpOrder.join("")).not.toBe(enOrder.join(""));
-  await page.getByRole("button", { name: "記号", exact: true }).click();
+  await page.getByRole("button", { name: "Symbols", exact: true }).click();
   await expect(page.locator("#keyset .keyrow")).toHaveCount(2);
   const symbolChips = await page.locator("#keyset .keyrow").nth(1).locator(".gkey").allTextContents();
   expect(symbolChips.length).toBeGreaterThan(10);
@@ -304,9 +304,9 @@ test("unlock order differs per course, and the symbol course includes symbol key
 
 test("the course display switches to match the practice mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "キー習得" }).click();
-  await page.getByRole("button", { name: "記号・レイヤー" }).click();
-  await expect(page.locator(".course-tabs button.active")).toHaveText("記号");
+  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.getByRole("button", { name: "Symbols & layers" }).click();
+  await expect(page.locator(".course-tabs button.active")).toHaveText("Symbols");
   await expect(page.locator("#keyset .keyrow")).toHaveCount(2);
 });
 
@@ -317,8 +317,8 @@ test("shows a prompt during a symbol run in key-mastery mode too", async ({ page
   }, fakeKeymap());
   await page.reload();
   await expect(page.locator("#status")).toHaveClass(/ok/);
-  await page.getByRole("button", { name: "キー習得" }).click();
-  await page.getByRole("button", { name: "記号・レイヤー" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.getByRole("button", { name: "Symbols & layers" }).click();
   await page.locator("#typeline").click();
   await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 });
   await expect(page.locator("#typeline .cur")).not.toBeEmpty();
@@ -332,9 +332,9 @@ test("shows the all-unlocked state once every key reaches the target speed", asy
     localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
   });
   await page.reload();
-  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
   await expect(page.locator("#keyset .gkey.locked")).toHaveCount(0);
-  await expect(page.locator("#guidedStatus")).toContainText("すべてのキーを解放しました");
+  await expect(page.locator("#guidedStatus")).toContainText("All keys unlocked");
 });
 
 test("the clear-history button reverts to the unlearned state", async ({ page }) => {
@@ -345,12 +345,32 @@ test("the clear-history button reverts to the unlearned state", async ({ page })
     localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
   });
   await page.reload();
-  await page.getByRole("button", { name: "キー習得" }).click();
+  await page.getByRole("button", { name: "Key Mastery" }).click();
   await expect(page.locator("#keyset .gkey.locked")).toHaveCount(0);
   page.on("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "履歴を消す" }).click();
+  await page.getByRole("button", { name: "Clear history" }).click();
   await expect(page.locator("#keyset .gkey.locked")).toHaveCount(20);
   await expect(page.locator("#btnGuidedReset")).toBeDisabled();
   const stored = await page.evaluate(() => localStorage.getItem("vialTypingGuided"));
   expect(stored).toBeNull();
+});
+
+test.describe("Japanese browser locale", () => {
+  test.use({ locale: "ja-JP" });
+
+  test("auto-detects Japanese and renders the UI in Japanese", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "キーボードから読み取る" })).toBeVisible();
+    await expect(page.locator("#status")).toContainText("既定のUS配列キーボード");
+    await expect(page.locator("#selLang")).toHaveValue("ja");
+    await expect(page).toHaveTitle(/タイピング/);
+  });
+
+  test("the language toggle overrides the detected locale after reload", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#selLang")).toHaveValue("ja");
+    await page.selectOption("#selLang", "en"); // writes the override and reloads
+    await expect(page.getByRole("button", { name: "Read from keyboard" })).toBeVisible();
+    await expect(page.locator("#selLang")).toHaveValue("en");
+  });
 });

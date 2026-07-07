@@ -5,6 +5,7 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3999",
     channel: "chrome",
+    locale: "en-US",
   },
   webServer: {
     command: "npm run build && npm run preview -- --port 3999 --strictPort",

@@ -1,5 +1,6 @@
 import "./StatBar.css";
 import { engine } from "../lib/engine";
+import { t } from "../lib/i18n";
 import { isUnlimited, settings } from "../lib/settings";
 
 export function StatBar() {
@@ -26,7 +27,7 @@ export function StatBar() {
     <div className="statbar">
       <div className="stat time" id="stTimeWrap">
         <span className="lbl" id="stTimeLbl">
-          {unlimited ? "経過時間" : "残り時間"}
+          {unlimited ? t("statbar.elapsed") : t("statbar.remaining")}
         </span>
         <b id="stTime" className={low ? "low" : ""}>
           {timeText}
@@ -42,15 +43,15 @@ export function StatBar() {
         <b id="stWpm">{wpm}</b>
       </div>
       <div className="stat">
-        <span className="lbl">正確率</span>
+        <span className="lbl">{t("statbar.accuracy")}</span>
         <b id="stAcc">{acc}%</b>
       </div>
       <div className="stat">
-        <span className="lbl">コンボ</span>
+        <span className="lbl">{t("statbar.combo")}</span>
         <b id="stCombo">{engine.combo}</b>
       </div>
       <div className="stat">
-        <span className="lbl">ミス</span>
+        <span className="lbl">{t("statbar.miss")}</span>
         <b id="stMiss">{engine.miss}</b>
       </div>
     </div>

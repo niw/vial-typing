@@ -1,5 +1,6 @@
 // Default keyboard: standard US tenkeyless (60%) layout shown before a keymap is loaded.
 // Lets practice start right away without connecting real hardware (replaceable via read/drop)
+import { t } from "./i18n";
 import { K_NONE, type KeyDef } from "./keycodes";
 import type { PhysKey } from "./layout";
 
@@ -104,12 +105,12 @@ function buildDefaultLayout() {
 
 const { physKeys, layer } = buildDefaultLayout();
 
-export const DEFAULT_STATUS_TEXT = "既定のUS配列キーボードを表示中（読み取り/ドロップで置き換え可）";
+export const DEFAULT_STATUS_TEXT = t("defaultKeyboard.statusText");
 
 export const DEFAULT_KEYBOARD = {
   rows: ROWS,
   cols: COLS,
   physKeys,
-  name: "US配列キーボード",
+  name: t("defaultKeyboard.name"),
   layers: [layer] as KeyDef[][][],
 };

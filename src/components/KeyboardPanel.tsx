@@ -1,6 +1,7 @@
 import "./KeyboardPanel.css";
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { currentExpected } from "../lib/hint";
+import { t } from "../lib/i18n";
 import { effKey, FINGER_NAMES, fingerFor, type Hint, KB, type KeyPos } from "../lib/kb";
 import { K_NONE, legendFor, shiftedSub } from "../lib/keycodes";
 import { settings } from "../lib/settings";
@@ -11,45 +12,52 @@ const colorLegend = (
   <div className="legend">
     <span>
       <i className="lt" />
-      押すキー
+      {t("keyboard.legendPressKey")}
     </span>
     <span>
       <i className="ls" />
-      Shiftを押しながら
+      {t("keyboard.legendWithShift")}
     </span>
     <span>
       <i className="ll" />
-      レイヤーキーを押しながら
+      {t("keyboard.legendWithLayer")}
     </span>
   </div>
 );
 
 const usageNote = (
   <div className="note">
-    ・<b>読み取り方法:</b> Vial対応キーボードをUSBケーブルで接続し「キーボードから読み取る」を押すと、
-    レイアウト定義とキーマップを自動で読み取ります（Chrome / Edge、WebHID対応ブラウザが必要）。
+    {t("keyboard.bullet")}
+    <b>{t("keyboard.noteReadLabel")}</b>
+    {t("keyboard.noteRead")}
     <br />
-    ・レイアウトの読み取りに失敗する場合は、キーボードの <code>vial.json</code> をドロップしてレイアウトを適用後、
+    {t("keyboard.bullet")}
+    {t("keyboard.noteFallbackPre")}
+    <code>vial.json</code>
+    {t("keyboard.noteFallbackMid")}
     <a href="https://vial.rocks" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
       Vial
-    </a>{" "}
-    でエクスポートした <code>.vil</code> をドロップしてください。
+    </a>
+    {t("keyboard.noteFallbackMid2")}
+    <code>.vil</code>
+    {t("keyboard.noteFallbackPost")}
     <br />
-    ・日本語ローマ字モードでは IME（日本語入力）を<b>オフ</b>にしてください。ローマ字は ヘボン式/訓令式
-    どちらでも入力できます（案内に使う綴りは設定の「ローマ字」で切替）。
+    {t("keyboard.bullet")}
+    {t("keyboard.noteImePre")}
+    <b>{t("keyboard.noteImeBold")}</b>
+    {t("keyboard.noteImePost")}
   </div>
 );
 
 const placeholder = (
   <div id="kb" style={{ width: "auto", height: "auto" }}>
     <div className="kb-placeholder">
-      ⌨️ キーボードが未読込です
+      {t("keyboard.placeholderTitle")}
       <br />
       <span>
-        「🔌
-        キーボードから読み取る」を押すと、接続中のVial対応キーボードからレイアウトとキーマップを自動で読み込みます。
+        {t("keyboard.placeholderBody1")}
         <br />
-        または vial.json（レイアウト）/ .vil（キーマップ）をこのページにドロップしてください。
+        {t("keyboard.placeholderBody2")}
       </span>
     </div>
   </div>
@@ -59,7 +67,7 @@ export function KeyboardPanel() {
   return (
     <section className="panel">
       <div className="kb-head">
-        <div className="title">キーボード（表示レイヤーを選択 / 入力時は自動切替）</div>
+        <div className="title">{t("keyboard.headTitle")}</div>
         <div className="layertabs" id="layertabs">
           {Array.from({ length: KB.layerCount }, (_, i) => (
             <button
@@ -216,14 +224,14 @@ function Keyboard() {
 function DebugLog() {
   return (
     <details className="note" id="dbgwrap" style={{ marginTop: "12px" }}>
-      <summary style={{ cursor: "pointer" }}>🔍 読み取りログ（うまく動かないときはここを確認）</summary>
+      <summary style={{ cursor: "pointer" }}>{t("keyboard.debugSummary")}</summary>
       <button
         type="button"
         id="btnDefDl"
         style={{ marginTop: "6px", fontSize: "11px", padding: "4px 10px" }}
         onClick={() => {
           if (!window.lastDefJson) {
-            alert("まだ定義を読み取っていません");
+            alert(t("keyboard.noDefAlert"));
             return;
           }
           const a = document.createElement("a");
@@ -232,7 +240,7 @@ function DebugLog() {
           a.click();
         }}
       >
-        読み取った定義をvial.jsonとして保存
+        {t("keyboard.saveDefBtn")}
       </button>
       <pre
         id="dbglog"
@@ -247,7 +255,7 @@ function DebugLog() {
           marginTop: "6px",
         }}
       >
-        {ui.log.length ? ui.log.join("\n") : "（まだ読み取りを実行していません）"}
+        {ui.log.length ? ui.log.join("\n") : t("keyboard.emptyLog")}
       </pre>
     </details>
   );

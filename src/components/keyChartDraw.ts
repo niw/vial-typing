@@ -1,5 +1,6 @@
 // Canvas rendering for the per-key speed-over-time chart (called from the component)
 import { GUIDED_TARGET_TIME, type GuidedKey, guidedWpm } from "../lib/guided";
+import { t } from "../lib/i18n";
 
 // Per-key speed-over-time chart (equivalent to keybr's KeyDetailsChart):
 // per-run speed scatter plot + smoothed-speed curve + target-speed horizontal line + current-position vertical line
@@ -76,7 +77,7 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
   if (!samples.length) {
     ctx.textAlign = "center";
     ctx.font = "12px sans-serif";
-    ctx.fillText("まだ記録がありません — この文字を打つと記録されます", box.x + box.w / 2, box.y + box.h / 2);
+    ctx.fillText(t("keyChart.empty"), box.x + box.w / 2, box.y + box.h / 2);
     return;
   }
 
@@ -97,7 +98,7 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
   ctx.fillStyle = colors.target;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("目標 " + targetWpm, box.x + box.w + 10, ty);
+  ctx.fillText(t("keyChart.target", { wpm: targetWpm }), box.x + box.w + 10, ty);
 
   // Current-position vertical line
   if (nowX > 0) {
@@ -112,7 +113,7 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
     ctx.textAlign = "left";
     ctx.textBaseline = "bottom";
     ctx.fillStyle = colors.text;
-    ctx.fillText("今", nx + 3, box.y - 2);
+    ctx.fillText(t("keyChart.now"), nx + 3, box.y - 2);
   }
 
   // Per-run measured-speed scatter plot

@@ -2,46 +2,47 @@ import "./Toolbar.css";
 import { audio } from "../lib/audio";
 import { engine } from "../lib/engine";
 import { type CourseId, guided, guidedRefreshJpCourse } from "../lib/guided";
+import { LOCALE_STORE_KEY, locale, t } from "../lib/i18n";
 import { charCache, KB } from "../lib/kb";
 import { applyRomajiStyle } from "../lib/romaji";
 import { type RomajiStyle, saveSetting, settings } from "../lib/settings";
 import { invalidate } from "../lib/store";
 
 const MODES = [
-  ["en", "英単語・英文"],
-  ["jp", "日本語ローマ字"],
-  ["sym", "記号・レイヤー"],
-  ["mix", "ミックス"],
+  ["en", t("toolbar.modeEn")],
+  ["jp", t("toolbar.modeJp")],
+  ["sym", t("toolbar.modeSym")],
+  ["mix", t("toolbar.modeMix")],
 ] as const;
 
 const TIMES = [
-  [30, "30秒"],
-  [60, "60秒"],
-  [90, "90秒"],
-  [0, "無制限"],
+  [30, t("toolbar.time30")],
+  [60, t("toolbar.time60")],
+  [90, t("toolbar.time90")],
+  [0, t("toolbar.unlimited")],
 ] as const;
 
 export function Toolbar() {
   return (
     <div className="toolbar">
       <div className="ctrl-group">
-        <span className="ctrl-label">モード</span>
+        <span className="ctrl-label">{t("toolbar.modeLabel")}</span>
         <div className="playstyle">
           <button type="button" className={engine.guided ? "" : "active"} onClick={() => setGuided(false)}>
-            通常
+            {t("toolbar.normal")}
           </button>
           <button
             type="button"
             className={engine.guided ? "active" : ""}
-            title="タイピング履歴に応じてキーを解放し、解放済みキーだけで打てるお題を出す"
+            title={t("toolbar.keyMasteryTitle")}
             onClick={() => setGuided(true)}
           >
-            キー習得
+            {t("toolbar.keyMastery")}
           </button>
         </div>
       </div>
       <div className="ctrl-group">
-        <span className="ctrl-label">練習モード</span>
+        <span className="ctrl-label">{t("toolbar.practiceModeLabel")}</span>
         <div className="modes">
           {MODES.map(([mode, label]) => (
             <button
@@ -56,7 +57,7 @@ export function Toolbar() {
         </div>
       </div>
       <div className="ctrl-group">
-        <span className="ctrl-label">プレイ時間</span>
+        <span className="ctrl-label">{t("toolbar.playTimeLabel")}</span>
         <div className="times">
           {TIMES.map(([seconds, label]) => (
             <button
@@ -75,12 +76,12 @@ export function Toolbar() {
         </div>
       </div>
       <div className="ctrl-group settings">
-        <span className="ctrl-label">設定</span>
+        <span className="ctrl-label">{t("toolbar.settingsLabel")}</span>
         <div className="settings-row">
           <button
             type="button"
             id="btnSound"
-            title="効果音のON/OFF"
+            title={t("toolbar.soundTitle")}
             onClick={() => {
               settings.soundOn = !settings.soundOn;
               saveSetting("cornixSound", settings.soundOn ? "1" : "0");
@@ -88,13 +89,10 @@ export function Toolbar() {
               if (settings.soundOn) audio.play("type"); // confirmation blip
             }}
           >
-            {settings.soundOn ? "🔊 音あり" : "🔇 音なし"}
+            {settings.soundOn ? t("toolbar.soundOn") : t("toolbar.soundOff")}
           </button>
-          <label
-            className="pref"
-            title="文字の出方の解釈。『US互換』= OSがUS設定で変換なし、またはOSがJIS設定でファームウェアがUS刻印通りに変換する場合。『JIS互換』= OSがJIS設定で変換なし、またはOSがUS設定でファームウェアがJIS刻印通りに変換する場合"
-          >
-            配列
+          <label className="pref" title={t("toolbar.outTitle")}>
+            {t("toolbar.outLabel")}
             <select
               id="selOut"
               value={settings.outMode}
@@ -105,12 +103,12 @@ export function Toolbar() {
                 invalidate();
               }}
             >
-              <option value="us">US互換</option>
-              <option value="jis">JIS互換</option>
+              <option value="us">{t("toolbar.outUs")}</option>
+              <option value="jis">{t("toolbar.outJis")}</option>
             </select>
           </label>
-          <label className="pref" title="同じ文字を複数の方法で入力できる場合に、どの打ち方を案内するか">
-            入力案内
+          <label className="pref" title={t("toolbar.prefTitle")}>
+            {t("toolbar.prefLabel")}
             <select
               id="selPref"
               value={settings.keyPref}
@@ -121,13 +119,13 @@ export function Toolbar() {
                 invalidate();
               }}
             >
-              <option value="auto">自動（おすすめ）</option>
-              <option value="shift">Shift優先</option>
-              <option value="layer">レイヤー優先</option>
+              <option value="auto">{t("toolbar.prefAuto")}</option>
+              <option value="shift">{t("toolbar.prefShift")}</option>
+              <option value="layer">{t("toolbar.prefLayer")}</option>
             </select>
           </label>
-          <label className="pref" title="日本語ローマ字の案内に使う綴り。どちらのスタイルの綴りでも入力はできます">
-            ローマ字
+          <label className="pref" title={t("toolbar.romajiTitle")}>
+            {t("toolbar.romajiLabel")}
             <select
               id="selRomaji"
               value={settings.romajiStyle}
@@ -139,24 +137,40 @@ export function Toolbar() {
                 engine.idle(); // reset the run since its words are stuck with the old spelling
               }}
             >
-              <option value="hepburn">ヘボン式</option>
-              <option value="kunrei">訓令式</option>
+              <option value="hepburn">{t("toolbar.romajiHepburn")}</option>
+              <option value="kunrei">{t("toolbar.romajiKunrei")}</option>
             </select>
           </label>
           <LayerPrefSelect
             id="selNumLayer"
             prefKey="num"
             store="cornixNumLayer"
-            label="数字"
-            title="数字をどのレイヤーで打つかを固定する"
+            label={t("toolbar.numLabel")}
+            title={t("toolbar.numTitle")}
           />
           <LayerPrefSelect
             id="selSymLayer"
             prefKey="sym"
             store="cornixSymLayer"
-            label="記号"
-            title="記号をどのレイヤーで打つかを固定する"
+            label={t("toolbar.symLabel")}
+            title={t("toolbar.symTitle")}
           />
+          <label className="pref" title={t("toolbar.langTitle")}>
+            {t("toolbar.langLabel")}
+            <select
+              id="selLang"
+              value={locale}
+              onChange={(e) => {
+                try {
+                  localStorage.setItem(LOCALE_STORE_KEY, e.currentTarget.value);
+                } catch {}
+                location.reload();
+              }}
+            >
+              <option value="en">{t("toolbar.langEn")}</option>
+              <option value="ja">{t("toolbar.langJa")}</option>
+            </select>
+          </label>
         </div>
       </div>
     </div>
@@ -204,7 +218,7 @@ function LayerPrefSelect({
           invalidate();
         }}
       >
-        <option value="auto">自動</option>
+        <option value="auto">{t("toolbar.layerAuto")}</option>
         {Array.from({ length: KB.layerCount }, (_, i) => (
           <option key={i} value={String(i)}>
             L{i}

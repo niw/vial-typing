@@ -5,6 +5,7 @@ import { engine } from "./engine";
 import { openTextFileTauri, saveTextFile } from "./fileDialog";
 import { guided, guidedImport, guidedRefreshJpCourse, guidedResultsSnapshot } from "./guided";
 import { loadVilText } from "./hid";
+import { t } from "./i18n";
 import { charCache, importKeymap, KB, keymapSnapshot } from "./kb";
 import { applyRomajiStyle } from "./romaji";
 import { settings, settingsImport, settingsSnapshot } from "./settings";
@@ -71,25 +72,25 @@ function backupFileName(): string {
 // Saves the current state to a file (browser: download, Tauri: OS save dialog)
 export async function saveBackup(): Promise<void> {
   const saved = await saveTextFile(backupFileName(), exportBackup());
-  if (saved) setStatus("ok", "✓ 現在の状態をファイルに保存しました");
+  if (saved) setStatus("ok", t("backup.saved"));
 }
 
 // Imports the contents of a backup file (restoring replaces the current keymap and practice records)
 export function importBackup(text: string): boolean {
   const raw = parseBackup(text);
   if (!raw) {
-    setStatus("err", "このファイルはVial Typingのバックアップではありません");
+    setStatus("err", t("backup.notBackup"));
     return false;
   }
   const data = migrateBackup(raw);
   if (!data) {
-    setStatus("err", "このバックアップは新しいバージョンのVial Typingのものです。アプリを更新してください");
+    setStatus("err", t("backup.newerVersion"));
     return false;
   }
   // Only confirm when replacing practice records would erase existing ones (guards against accidental loss)
   const willReplaceRecords = !!(data.guided && Array.isArray(data.guided.results));
   if (willReplaceRecords && guided.results.length) {
-    if (!confirm("現在の練習記録を、ファイルの内容で置き換えます。よろしいですか？")) return false;
+    if (!confirm(t("backup.confirmReplace"))) return false;
   }
   const restored: string[] = [];
   // Apply settings first: so things like layer pinning are covered by the layer-count check when the keymap is applied
@@ -99,21 +100,23 @@ export function importBackup(text: string): boolean {
     charCache.clear();
     applyRomajiStyle(settings.romajiStyle);
     guidedRefreshJpCourse();
-    restored.push("設定");
+    restored.push(t("backup.partSettings"));
   }
-  if (data.keymap && importKeymap(data.keymap)) restored.push("キーマップ");
+  if (data.keymap && importKeymap(data.keymap)) restored.push(t("backup.partKeymap"));
   if (willReplaceRecords) {
     guidedImport(data.guided!.results);
-    restored.push("練習記録");
+    restored.push(t("backup.partRecords"));
   }
   if (!restored.length) {
-    setStatus("err", "取り込める状態がバックアップにありませんでした");
+    setStatus("err", t("backup.nothingImported"));
     return false;
   }
   engine.idle(); // reset the run to reflect the new keymap/settings
   // Keep the display order stable regardless of application order
-  const label = ["キーマップ", "練習記録", "設定"].filter((part) => restored.includes(part)).join("・");
-  setStatus("ok", "✓ " + label + "を復元しました");
+  const label = [t("backup.partKeymap"), t("backup.partRecords"), t("backup.partSettings")]
+    .filter((part) => restored.includes(part))
+    .join(t("backup.join"));
+  setStatus("ok", t("backup.restored", { label }));
   return true;
 }
 

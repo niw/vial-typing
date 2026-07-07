@@ -1,6 +1,7 @@
 import "./TypePanel.css";
 import { engine } from "../lib/engine";
 import { currentExpected } from "../lib/hint";
+import { t } from "../lib/i18n";
 import { FINGER_NAMES, fingerFor, type Hint, type KeyPos } from "../lib/kb";
 import { dispChar } from "../lib/keycodes";
 
@@ -21,8 +22,8 @@ export function TypePanel() {
 // The idle-state prompt is static, so build it once at module level
 const startPrompt = (
   <>
-    <span className="start-prompt">▶ スタート</span>
-    <span className="start-sub">クリック / Space / Enter で開始　・　プレイ中は ESC で戻る</span>
+    <span className="start-prompt">{t("typePanel.startPrompt")}</span>
+    <span className="start-sub">{t("typePanel.startSub")}</span>
   </>
 );
 
@@ -93,7 +94,9 @@ function HintBar() {
 function HintMissing({ ch }: { ch: string }) {
   return (
     <>
-      ⚠ このキーマップでは「<b>{dispChar(ch)}</b>」が見つかりません（Enterでスキップ）
+      {t("typePanel.hintMissingPre")}
+      <b>{dispChar(ch)}</b>
+      {t("typePanel.hintMissingPost")}
     </>
   );
 }
@@ -106,11 +109,13 @@ function HintChips({ ch, hint }: { ch: string; hint: Hint }) {
       {shiftFirst ? (
         <>
           <span className="chip s">
-            <FingerBadge pos={hint.shiftKey} />① Shift を先に押しながら
+            <FingerBadge pos={hint.shiftKey} />
+            {t("typePanel.shiftFirst")}
           </span>
           ＋
           <span className="chip l">
-            <FingerBadge pos={hint.layerKey} />② L{hint.layer} キー
+            <FingerBadge pos={hint.layerKey} />
+            {t("typePanel.layerOrdered", { layer: hint.layer })}
           </span>
           ＋
         </>
@@ -119,7 +124,8 @@ function HintChips({ ch, hint }: { ch: string; hint: Hint }) {
           {hint.layerKey && (
             <>
               <span className="chip l">
-                <FingerBadge pos={hint.layerKey} />L{hint.layer} キーを押しながら
+                <FingerBadge pos={hint.layerKey} />
+                {t("typePanel.layerHold", { layer: hint.layer })}
               </span>
               ＋
             </>
@@ -139,19 +145,24 @@ function HintChips({ ch, hint }: { ch: string; hint: Hint }) {
         <FingerBadge pos={hint.key} />
         {dispChar(ch)}
       </span>
-      {alt && <span className="alt">別案: {alt}</span>}
+      {alt && (
+        <span className="alt">
+          {t("typePanel.altPrefix")}
+          {alt}
+        </span>
+      )}
     </>
   );
 }
 
 function altText(a: Hint, ch: string) {
   let alt = "";
-  if (a.shiftKey?.fromBase && a.layerKey) alt += "Shift先押し＋L" + a.layer + "キー＋";
+  if (a.shiftKey?.fromBase && a.layerKey) alt += t("typePanel.altShiftFirst", { layer: a.layer });
   else {
-    if (a.layerKey) alt += "L" + a.layer + "キー＋";
-    if (a.shiftKey) alt += "Shift＋";
+    if (a.layerKey) alt += t("typePanel.altLayer", { layer: a.layer });
+    if (a.shiftKey) alt += t("typePanel.altShift");
   }
-  if (!a.layerKey && !a.shiftKey) alt += "そのまま ";
+  if (!a.layerKey && !a.shiftKey) alt += t("typePanel.altPlain");
   return alt + dispChar(ch);
 }
 
@@ -164,7 +175,7 @@ function Queue() {
     : "";
   return (
     <div id="queue" className="mono">
-      {next ? "次: " + next : ""}
+      {next ? t("typePanel.queuePrefix") + next : ""}
     </div>
   );
 }

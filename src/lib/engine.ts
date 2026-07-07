@@ -3,6 +3,7 @@
 import { audio } from "./audio";
 import { EN_SENTS, EN_WORDS, JP_SENTS, JP_WORDS, SYM_ITEMS } from "./data";
 import { type GuidedStep, guided, guidedBuildPools, guidedRecordRun, guidedUpdateKeys } from "./guided";
+import { t } from "./i18n";
 import { findKeyForChar, KB } from "./kb";
 import { type KanaUnit, tokenizeKana } from "./romaji";
 import { isUnlimited, settings } from "./settings";
@@ -131,8 +132,7 @@ export const engine = {
   start() {
     if (this.counting) return;
     if (!KB.layerCount) {
-      this.notice =
-        "⌨️ 先にキーボードを読み込んでください（「キーボードから読み取る」または vial.json / .vil をドロップ）";
+      this.notice = t("engine.notice");
       invalidate();
       return;
     }

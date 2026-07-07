@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { loadFileText } from "../lib/backup";
 import { engine } from "../lib/engine";
 import { currentExpected } from "../lib/hint";
+import { t } from "../lib/i18n";
 import { KB } from "../lib/kb";
 import { isUnlimited } from "../lib/settings";
 import { invalidate, ui } from "../lib/store";
@@ -122,7 +123,7 @@ export function App() {
         </div>
       </div>
       <div id="drop" className={ui.dropVisible ? "show" : ""}>
-        .vil / vial.json / バックアップ をドロップして読み込み
+        {t("app.dropText")}
       </div>
       <ResultDialog />
       <DevicePicker />

@@ -1,5 +1,6 @@
 // Keymap state and reverse lookup (char → key+Shift+layer), plus finger-number estimation
 import { DEFAULT_KEYBOARD, DEFAULT_STATUS_TEXT } from "./defaultKeyboard";
+import { t } from "./i18n";
 import { charsOf, K_NONE, type KeyDef, modsHaveShift, tapOf } from "./keycodes";
 import type { PhysKey } from "./layout";
 import { settings } from "./settings";
@@ -34,9 +35,9 @@ export function setKeymap(layers: KeyDef[][][], source: string, label?: string, 
       settings.layerPref[key] = "auto";
   }
   if (source === "sample") {
-    setStatus("", "キーマップ未読込（サンプル表示中）");
+    setStatus("", t("kb.sampleStatus"));
   } else {
-    setStatus("ok", "✓ " + label + "（" + layers.length + "レイヤー）" + (restored ? " · 前回のキーマップを復元" : ""));
+    setStatus("ok", t("kb.applied", { label, layers: layers.length }) + (restored ? t("kb.appliedRestored") : ""));
     // save the actually loaded layout+keymap to the browser so it auto-restores next time
     if (!restored) saveKeymap(layers, source, label);
   }
@@ -82,7 +83,7 @@ function applyKeymapData(data: unknown, restored: boolean): boolean {
   KB.cols = d.matrixCols || KB.cols;
   KB.physKeys = d.physKeys;
   KB.name = d.kbName || d.label || "Keyboard";
-  setKeymap(d.layers, d.source || "vil", d.label || "保存済みキーマップ", restored);
+  setKeymap(d.layers, d.source || "vil", d.label || t("kb.savedKeymapLabel"), restored);
   return true;
 }
 
@@ -183,7 +184,7 @@ function physHas(r: number, c: number) {
 }
 
 // estimate finger number from the physical layout (1=thumb, 2=index, 3=middle, 4=ring, 5=pinky)
-export const FINGER_NAMES: Record<number, string> = { 1: "親指", 2: "人差し指", 3: "中指", 4: "薬指", 5: "小指" };
+export const FINGER_NAMES = t("kb.fingerNames", { returnObjects: true }) as Record<number, string>;
 let _fingerRef: PhysKey[] | null = null;
 let _fingerMap: Map<string, number> | null = null;
 export function fingerFor(row: number, col: number): number | null {

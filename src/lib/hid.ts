@@ -2,6 +2,7 @@
 // HID I/O goes through HidTransport, so the same logic works across the browser (WebHID) and Tauri (Rust).
 import { engine } from "./engine";
 import { getHidTransport, type HidConnection } from "./hidTransport";
+import { t } from "./i18n";
 import { KB, setKeymap } from "./kb";
 import { decodeNum, K_NONE, type KeyDef, parseVil } from "./keycodes";
 import { parseKLE, type VialDefinition } from "./layout";
@@ -15,10 +16,9 @@ function dlog(msg: string) {
 
 // apply a vial.json-style definition: {name, matrix:{rows,cols}, layouts:{keymap:[KLE]}}
 export function applyDefinition(def: VialDefinition, label?: string) {
-  if (!def?.matrix || !def.layouts || !Array.isArray(def.layouts.keymap))
-    throw new Error("vial.json形式ではありません");
+  if (!def?.matrix || !def.layouts || !Array.isArray(def.layouts.keymap)) throw new Error(t("hid.notVialJson"));
   const keys = parseKLE(def.layouts.keymap);
-  if (!keys.length) throw new Error("レイアウトにキーがありません");
+  if (!keys.length) throw new Error(t("hid.noLayoutKeys"));
   KB.rows = def.matrix.rows;
   KB.cols = def.matrix.cols;
   KB.physKeys = keys;
@@ -71,18 +71,17 @@ export async function connectHID() {
   if (engine.running) engine.idle(); // reading a keymap resets to the pre-start menu
   const transport = await getHidTransport();
   if (!transport.available) {
-    setStatus("err", "この環境はHID接続に非対応です。Chrome/Edgeを使うか .vil を読み込んでください");
+    setStatus("err", t("hid.unsupported"));
     return;
   }
   let conn: HidConnection | null = null;
   try {
     conn = await transport.open();
     if (!conn) return; // device selection was cancelled
-    setStatus("", "レイアウト定義を読み取り中…");
+    setStatus("", t("hid.readingLayout"));
     ui.log.length = 0;
     dlog(
-      "デバイス: " +
-        conn.label +
+      t("hid.device", { label: conn.label }) +
         (conn.vendorId != null ? "  vendor=0x" + conn.vendorId.toString(16) : "") +
         (conn.productId != null ? " product=0x" + conn.productId.toString(16) : ""),
     );
@@ -91,14 +90,14 @@ export async function connectHID() {
     try {
       try {
         const idr = await hidCmdRetry(conn, [0xfe, 0x00]); // vial_get_keyboard_id (optional)
-        dlog("vial応答(FE00): " + hex(idr, 12) + "  → プロトコルv" + (idr[0] | (idr[1] << 8)));
+        dlog(t("hid.vialResponse", { hex: hex(idr, 12), version: idr[0] | (idr[1] << 8) }));
       } catch {
-        dlog("FE00応答なし（continue）");
+        dlog(t("hid.noFe00"));
       }
       const szr = await hidCmdRetry(conn, [0xfe, 0x01]);
-      dlog("サイズ応答(FE01): " + hex(szr, 8));
+      dlog(t("hid.sizeResponse", { hex: hex(szr, 8) }));
       const sz = (szr[0] | (szr[1] << 8) | (szr[2] << 16) | (szr[3] << 24)) >>> 0;
-      dlog("定義サイズ: " + sz + " bytes");
+      dlog(t("hid.defSize", { size: sz }));
       if (sz > 0 && sz < 200000) {
         const comp = new Uint8Array(sz);
         for (let blk = 0; blk * 32 < sz; blk++) {
@@ -112,36 +111,33 @@ export async function connectHID() {
           ]);
           comp.set(r.subarray(0, Math.min(32, sz - blk * 32)), blk * 32);
         }
-        dlog("定義先頭: " + hex(comp, 8) + (comp[0] === 0xfd ? " (xz形式)" : " (xz以外)"));
+        dlog(t("hid.defHead", { hex: hex(comp, 8) }) + (comp[0] === 0xfd ? t("hid.xzFormat") : t("hid.nonXz")));
         const json = await decompressDefinition(comp);
-        dlog("展開OK: " + json.length + "文字");
+        dlog(t("hid.decompressed", { chars: json.length }));
         window.lastDefJson = json; // debugging: raw definition
         const def = JSON.parse(json);
         dlog(
-          "定義: name=" +
-            def.name +
-            " matrix=" +
-            (def.matrix && def.matrix.rows + "x" + def.matrix.cols) +
-            " layouts=" +
-            !!def.layouts?.keymap,
+          t("hid.defInfo", {
+            name: def.name,
+            matrix: def.matrix && def.matrix.rows + "x" + def.matrix.cols,
+            hasLayouts: !!def.layouts?.keymap,
+          }),
         );
         applyDefinition(def, conn.label);
-        dlog("レイアウト適用OK: " + KB.physKeys.length + "キー（マトリクス " + KB.rows + "x" + KB.cols + "）");
-        dlog("--- 定義JSON全文（不具合報告用） ---");
+        dlog(t("hid.layoutApplied", { keys: KB.physKeys.length, rows: KB.rows, cols: KB.cols }));
+        dlog(t("hid.fullJsonHeader"));
         dlog(json);
-      } else throw new Error("定義サイズが不正 (" + sz + ")");
+      } else throw new Error(t("hid.invalidDefSize", { size: sz }));
     } catch (e) {
-      dlog("✗ 定義読み取り失敗: " + e.message);
-      dlog(
-        "レイアウト不明のままキーマップは読み取りません。vial.jsonをドロップしてから.vilを読み込むか、再試行してください。",
-      );
+      dlog(t("hid.defReadFailed", { message: e.message }));
+      dlog(t("hid.defReadHint"));
       console.warn("definition read failed:", e);
-      setStatus("err", "レイアウト定義の読み取りに失敗: " + e.message + "（読み取りログ参照）");
+      setStatus("err", t("hid.defReadStatus", { message: e.message }));
       const dbg = document.getElementById("dbgwrap") as HTMLDetailsElement | null;
       if (dbg) dbg.open = true;
       return;
     }
-    setStatus("", "キーマップを読み取り中…");
+    setStatus("", t("hid.readingKeymap"));
 
     let layerCount = 4;
     try {
@@ -172,10 +168,10 @@ export async function connectHID() {
       }
       layers.push(g);
     }
-    dlog("キーマップ読み取りOK: " + layerCount + "レイヤー (" + KB.rows + "x" + KB.cols + ")");
+    dlog(t("hid.keymapRead", { layers: layerCount, rows: KB.rows, cols: KB.cols }));
     setKeymap(layers, "hid", KB.name || conn.label || "Keyboard");
   } catch (err) {
-    setStatus("err", "読み取り失敗: " + err.message + "（USB接続を確認するか .vil を読み込んでください）");
+    setStatus("err", t("hid.readFailed", { message: err.message }));
   } finally {
     // release the raw-HID interface right away — only one app can hold it,
     // and keeping it open blocks Vial from connecting to the keyboard
@@ -194,10 +190,10 @@ export function loadVilText(text: string, name: string) {
     if (data.layouts && data.matrix) {
       // vial.json -> layout definition
       applyDefinition(data, name);
-      setStatus("ok", "✓ レイアウト適用: " + KB.name + "（キーマップは未読込）");
+      setStatus("ok", t("hid.layoutOnly", { name: KB.name }));
       return;
     }
-    if (!Array.isArray(data.layout)) throw new Error("layoutがありません");
+    if (!Array.isArray(data.layout)) throw new Error(t("hid.noLayout"));
     const layers = (data.layout as (string | number)[][][]).map((layer) => {
       const g: KeyDef[][] = Array.from({ length: KB.rows }, () => Array(KB.cols).fill(K_NONE));
       layer.forEach((row, r) => {
@@ -216,6 +212,6 @@ export function loadVilText(text: string, name: string) {
       layers.pop();
     setKeymap(layers, "vil", name);
   } catch (err) {
-    setStatus("err", ".vilの解析に失敗: " + err.message);
+    setStatus("err", t("hid.vilParseFailed", { message: err.message }));
   }
 }

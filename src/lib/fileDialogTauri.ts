@@ -3,8 +3,9 @@
 // The caller (fileDialog.ts) only imports this module when isTauri, so it never lands in the web bundle.
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { t } from "./i18n";
 
-const FILTERS = [{ name: "Vial Typing バックアップ", extensions: ["json"] }];
+const FILTERS = [{ name: t("fileDialog.backupFilter"), extensions: ["json"] }];
 
 // pick a path via the OS save dialog and write it out on the Rust side. returns false if cancelled
 export async function tauriSaveTextFile(defaultName: string, contents: string): Promise<boolean> {

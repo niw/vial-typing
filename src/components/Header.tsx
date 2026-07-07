@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { loadFileText, openBackupDialog, saveBackup } from "../lib/backup";
 import { engine } from "../lib/engine";
 import { connectHID } from "../lib/hid";
+import { t } from "../lib/i18n";
 import { forgetSavedKeymap, hasSavedKeymap } from "../lib/kb";
 import { isTauri } from "../lib/platform";
 import { ui } from "../lib/store";
@@ -15,44 +16,39 @@ export function Header() {
       <h1>
         Vial <span>Typing</span>
       </h1>
-      <div className="sub">Vial対応キーボードのレイアウトとキーマップを読み取って練習</div>
+      <div className="sub">{t("header.sub")}</div>
       <div className="actions">
         <div id="status" className={ui.status.cls}>
           {ui.status.text}
         </div>
         <button type="button" id="btnConnect" className="primary" onClick={() => void connectHID()}>
-          🔌 キーボードから読み取る
+          {t("header.connect")}
         </button>
         <button type="button" id="btnVil" onClick={() => fileRef.current?.click()}>
-          📄 .vilを開く
+          {t("header.openVil")}
         </button>
         <button
           type="button"
           id="btnForget"
-          title="保存したレイアウト・キーマップを消して未読込に戻す"
+          title={t("header.forgetTitle")}
           hidden={!hasSavedKeymap()}
           onClick={() => {
             forgetSavedKeymap();
             engine.idle();
           }}
         >
-          🗑 キーマップを消す
+          {t("header.forget")}
         </button>
-        <button
-          type="button"
-          id="btnSave"
-          title="キーマップ・練習記録・設定をファイルに保存"
-          onClick={() => void saveBackup()}
-        >
-          💾 保存
+        <button type="button" id="btnSave" title={t("header.saveTitle")} onClick={() => void saveBackup()}>
+          {t("header.save")}
         </button>
         <button
           type="button"
           id="btnRestore"
-          title="保存したキーマップ・練習記録・設定をファイルから復元"
+          title={t("header.restoreTitle")}
           onClick={() => (isTauri() ? void openBackupDialog() : backupRef.current?.click())}
         >
-          📂 復元
+          {t("header.restore")}
         </button>
       </div>
       <input

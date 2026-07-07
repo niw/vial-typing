@@ -1,6 +1,7 @@
 import "./DevicePicker.css";
 import { useEffect, useRef } from "react";
 import { picker, resolveDevicePick } from "../lib/devicePicker";
+import { t } from "../lib/i18n";
 
 // Selection dialog shown on the Tauri build when multiple HID devices are found (the web build uses the browser's own dialog)
 export function DevicePicker() {
@@ -21,11 +22,11 @@ export function DevicePicker() {
         resolveDevicePick(null);
       }}
     >
-      <h2>キーボードを選択</h2>
+      <h2>{t("device.title")}</h2>
       <div className="device-list">
         {devices?.map((d) => (
           <button type="button" key={d.path} className="device" onClick={() => resolveDevicePick(d)}>
-            <b>{d.product || "(名称不明)"}</b>
+            <b>{d.product || t("device.unknownName")}</b>
             <span className="mono">
               {d.vendorId.toString(16).padStart(4, "0")}:{d.productId.toString(16).padStart(4, "0")}
             </span>
@@ -34,7 +35,7 @@ export function DevicePicker() {
       </div>
       <div className="device-cancel">
         <button type="button" onClick={() => resolveDevicePick(null)}>
-          キャンセル
+          {t("device.cancel")}
         </button>
       </div>
     </dialog>

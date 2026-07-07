@@ -13,13 +13,14 @@ import {
   guidedSelectedKey,
   guidedWpm,
 } from "../lib/guided";
+import { t } from "../lib/i18n";
 import { invalidate } from "../lib/store";
 import { drawKeyChart } from "./keyChartDraw";
 
 const COURSES: [CourseId, string][] = [
-  ["en", "英語"],
-  ["jp", "日本語"],
-  ["sym", "記号"],
+  ["en", t("guided.courseEn")],
+  ["jp", t("guided.courseJp")],
+  ["sym", t("guided.courseSym")],
 ];
 
 export function GuidedPanel() {
@@ -29,13 +30,13 @@ export function GuidedPanel() {
   const letterFocus = guidedFocusOf(course.letters);
   const symbolFocus = course.symbols ? guidedFocusOf(course.symbols) : null;
   const parts = [];
-  if (letterFocus) parts.push("習得中のキー: " + letterFocus.toUpperCase());
-  if (symbolFocus) parts.push("記号: " + symbolFocus);
+  if (letterFocus) parts.push(t("guided.focusLetter", { key: letterFocus.toUpperCase() }));
+  if (symbolFocus) parts.push(t("guided.focusSymbol", { sym: symbolFocus }));
   const selected = guidedSelectedKey();
   return (
     <div id="guided">
       <div className="guided-head">
-        <span className="title">🔓 タイピング履歴に応じてキーが解放され、出題単語が変わります</span>
+        <span className="title">{t("guided.headTitle")}</span>
         <div className="course-tabs">
           {COURSES.map(([id, label]) => (
             <button
@@ -53,18 +54,18 @@ export function GuidedPanel() {
             </button>
           ))}
         </div>
-        <span id="guidedStatus">{parts.length ? parts.join(" ・ ") : "🎉 すべてのキーを解放しました"}</span>
+        <span id="guidedStatus">{parts.length ? parts.join(t("guided.sep")) : t("guided.allUnlocked")}</span>
         <button
           type="button"
           id="btnGuidedReset"
-          title="キー習得モードの練習履歴を消して未習得の状態に戻す"
+          title={t("guided.resetTitle")}
           disabled={!guided.results.length}
           onClick={() => {
-            if (!confirm("キー習得モードの練習履歴を消します。よろしいですか？")) return;
+            if (!confirm(t("guided.resetConfirm"))) return;
             guidedReset();
           }}
         >
-          🗑 履歴を消す
+          {t("guided.resetButton")}
         </button>
       </div>
       <div id="keyset">
@@ -91,10 +92,12 @@ function GKeyChip({ guidedKey: key, isSelected }: { guidedKey: GuidedKey; isSele
   if (isSelected) classes.push("selected");
   const colored = key.included && key.confidence != null;
   if (colored) classes.push("colored");
+  const name = key.ch.toUpperCase();
   const title = key.included
-    ? key.ch.toUpperCase() +
-      (key.confidence == null ? "（未計測）" : "（信頼度 " + Math.round(key.confidence * 100) + "%）")
-    : key.ch.toUpperCase() + "（未解放）";
+    ? key.confidence == null
+      ? t("guided.chipUnmeasured", { name })
+      : t("guided.chipConfidence", { name, pct: Math.round(key.confidence * 100) })
+    : t("guided.chipLocked", { name });
   return (
     <button
       type="button"
@@ -118,17 +121,17 @@ function KeyInfo({ guidedKey: key }: { guidedKey: GuidedKey }) {
     <div id="keyInfo">
       <b className="gkey-name">{key.ch.toUpperCase()}</b>
       {!key.included ? (
-        <> 🔒 未解放：前のキーがすべて目標速度（35 WPM）に達すると解放されます</>
+        t("guided.infoLocked")
       ) : key.timeToType == null ? (
-        <> 未計測：もう少し打鍵データが必要です</>
+        t("guided.infoUnmeasured")
       ) : (
         <>
-          {" 直前 "}
+          {t("guided.infoRecent")}
           <b>{guidedWpm(key.timeToType)} WPM</b>
-          {"（信頼度 " + pct(key.confidence ?? 0) + "）・自己ベスト "}
+          {t("guided.infoConfBest", { pct: pct(key.confidence ?? 0) })}
           <b>{guidedWpm(key.bestTimeToType ?? 0)} WPM</b>
-          {"（" + pct(key.bestConfidence ?? 0) + "）"}
-          {rate != null && "・学習率 " + (rate >= 0 ? "+" : "") + rate.toFixed(1) + " WPM/走行"}
+          {t("guided.infoBestPct", { pct: pct(key.bestConfidence ?? 0) })}
+          {rate != null && t("guided.infoLearnRate", { rate: (rate >= 0 ? "+" : "") + rate.toFixed(1) })}
         </>
       )}
     </div>

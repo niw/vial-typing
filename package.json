@@ -27,9 +27,11 @@
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.1",
+    "i18next": "^26.3.4",
     "lzma": "^2.3.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-i18next": "^17.0.8",
     "xz-decompress": "^0.2.3"
   }
 }
