@@ -2,49 +2,50 @@
 
 [![Deploy GitHub Pages](https://github.com/niw/vial-typing/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/niw/vial-typing/actions/workflows/deploy-pages.yml)
 
-**[アプリをブラウザで開く](https://niw.github.io/vial-typing/)**
+*[日本語 ](README-ja.md)*
 
-Vial対応キーボード全般で使えるタイピング練習ソフト。
+**[Open the app in your browser](https://niw.github.io/vial-typing/)**
 
-接続したキーボードから**レイアウト定義とキーマップを直接読み取り**、次に押すべきキー（レイヤーキー・Shiftの押し順を含む）をキーボード図上にインジケータ表示します。[Cornix](https://en.zfrontier.com/products/in-stock-cornix-tented-low-profile-split-ergo-keyboard-by-jezail-funder)（Jezail Funder）向けに開発し、汎用化したものです。
+A typing practice tool that works with any Vial-compatible keyboard.
 
-## 特徴
+It reads the **layout definition and keymap directly** from the connected keyboard, then shows an indicator on the keyboard diagram for the next key to press (including layer keys and Shift press order). Originally built for the [Cornix](https://en.zfrontier.com/products/in-stock-cornix-tented-low-profile-split-ergo-keyboard-by-jezail-funder) (Jezail Funder) and later generalized.
 
-- **キーマップなしでもすぐ使える**: 起動直後は標準USテンキーレス配列を既定表示。実機やファイルが無くてもそのまま練習を始められる
-- **レイアウト自動認識**: WebHID（Vialプロトコル）で接続キーボードからレイアウト定義（xz圧縮vial.json）とキーマップを読み取り。QMK(Vial)/RMKどちらのファームウェアにも対応
-- **ファイル読み込み**: `vial.json`（レイアウト）と `.vil`（キーマップ）のドラッグ＆ドロップにも対応
-- **4モード**: 英単語・英文 / 日本語ローマ字（ヘボン式・訓令式両対応）/ 記号・レイヤー練習 / ミックス
-- **寿司打スタイル**: 30・60・90秒選択、30コンボごとに+1秒ボーナス、総合スコアとランク判定
-- **入力案内のカスタマイズ**: Shift優先/レイヤー優先、数字・記号のレイヤー固定、第2候補の薄表示
-- **効果音**: タイプ音・コンボ音・ミス音（ON/OFF切替可）
+## Features
 
-## 使い方
+- **Automatic layout detection**: reads the layout definition (xz-compressed vial.json) and keymap from the connected keyboard over WebHID (the Vial protocol); works with both QMK (Vial) and RMK firmware
+- **File loading**: also supports drag-and-drop of `vial.json` (layout) and `.vil` (keymap) files
+- **4 modes**: English words/sentences / Japanese romaji (both Hepburn and Kunrei styles) / symbols & layers / mixed
+- **Sushida-style scoring**: choose 30/60/90 seconds, +1 second bonus every 30-combo, overall score and rank
+- **Customizable input guidance**: Shift-first vs. layer-first, fixed layer for numbers/symbols, dimmed display of the second candidate
+- **Sound effects**: keystroke, combo, and miss sounds (toggleable)
 
-ブラウザ（Chrome / Edge 推奨。WebHIDが必要）で開き、「キーボードから読み取る」を押すだけ。
-macOS アプリ（下記）でも同じように使えます。
+## Usage
 
-## 開発
+Open it in a browser (Chrome/Edge recommended; WebHID required) and just click "Read from keyboard."
+The macOS app (below) works the same way.
 
-Vite + React + TypeScript 構成。ソースは `src/` にあり、ロジックと状態は `src/lib/`、
-UI は `src/components/` に分かれています（全体像は `docs/app-overview.md`）。
+## Development
+
+Vite + React + TypeScript. Source lives under `src/`, with logic and state in `src/lib/`
+and UI in `src/components/` (see `docs/app-overview.md` for the overall picture).
 
 ```sh
 npm install
-npm run dev     # 開発サーバー（make run でも可）
-npm run build   # 型チェック + dist/ へビルド
-npm run test    # Playwrightテスト（ビルドして実行）
+npm run dev     # dev server (or `make run`)
+npm run build   # typecheck + build into dist/
+npm run test    # Playwright tests (builds then runs)
 npm run lint    # Biome
 ```
 
-### macOS アプリ (Tauri)
+### macOS app (Tauri)
 
-同じフロントを Tauri で包んで .app 化できます（`src-tauri/`）。WKWebView は WebHID 非対応なので、
-HIDアクセスだけ Rust (hidapi) 側に実装し、実行時に web/Tauri のトランスポートを切り替えています。
-Rust ツールチェーンが必要です。
+The same frontend can be wrapped with Tauri into a .app (`src-tauri/`). Since WKWebView doesn't
+support WebHID, HID access is implemented on the Rust (hidapi) side only, and the web/Tauri
+transport is switched at runtime. Requires the Rust toolchain.
 
 ```sh
-npm run tauri:dev     # アプリを開発起動
-npm run tauri:build   # .app / .dmg をビルド
+npm run tauri:dev     # run the app in development
+npm run tauri:build   # build .app / .dmg
 ```
 
 ## License
