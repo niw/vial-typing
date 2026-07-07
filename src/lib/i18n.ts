@@ -42,6 +42,9 @@ const en = {
     saveTitle: "Save the keymap, practice records, and settings to a file",
     restore: "📂 Restore",
     restoreTitle: "Restore the saved keymap, practice records, and settings from a file",
+    langTitle: "UI display language",
+    langEn: "English",
+    langJa: "日本語",
   },
 
   toolbar: {
@@ -82,10 +85,6 @@ const en = {
     symLabel: "Symbols",
     symTitle: "Pin which layer symbols are typed on",
     layerAuto: "Auto",
-    langLabel: "Language",
-    langTitle: "UI display language",
-    langEn: "English",
-    langJa: "日本語",
   },
 
   statbar: {
@@ -271,6 +270,9 @@ const ja: typeof en = {
     saveTitle: "キーマップ・練習記録・設定をファイルに保存",
     restore: "📂 復元",
     restoreTitle: "保存したキーマップ・練習記録・設定をファイルから復元",
+    langTitle: "UIの表示言語",
+    langEn: "English",
+    langJa: "日本語",
   },
 
   toolbar: {
@@ -311,10 +313,6 @@ const ja: typeof en = {
     symLabel: "記号",
     symTitle: "記号をどのレイヤーで打つかを固定する",
     layerAuto: "自動",
-    langLabel: "表示言語",
-    langTitle: "UIの表示言語",
-    langEn: "English",
-    langJa: "日本語",
   },
 
   statbar: {

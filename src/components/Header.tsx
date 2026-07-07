@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { loadFileText, openBackupDialog, saveBackup } from "../lib/backup";
 import { engine } from "../lib/engine";
 import { connectHID } from "../lib/hid";
-import { t } from "../lib/i18n";
+import { LOCALE_STORE_KEY, locale, t } from "../lib/i18n";
 import { forgetSavedKeymap, hasSavedKeymap } from "../lib/kb";
 import { isTauri } from "../lib/platform";
 import { ui } from "../lib/store";
@@ -50,6 +50,22 @@ export function Header() {
         >
           {t("header.restore")}
         </button>
+        <select
+          id="selLang"
+          className="lang-select"
+          title={t("header.langTitle")}
+          aria-label={t("header.langTitle")}
+          value={locale}
+          onChange={(e) => {
+            try {
+              localStorage.setItem(LOCALE_STORE_KEY, e.currentTarget.value);
+            } catch {}
+            location.reload();
+          }}
+        >
+          <option value="en">{t("header.langEn")}</option>
+          <option value="ja">{t("header.langJa")}</option>
+        </select>
       </div>
       <input
         type="file"

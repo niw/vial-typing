@@ -2,7 +2,7 @@ import "./Toolbar.css";
 import { audio } from "../lib/audio";
 import { engine } from "../lib/engine";
 import { type CourseId, guided, guidedRefreshJpCourse } from "../lib/guided";
-import { LOCALE_STORE_KEY, locale, t } from "../lib/i18n";
+import { t } from "../lib/i18n";
 import { charCache, KB } from "../lib/kb";
 import { applyRomajiStyle } from "../lib/romaji";
 import { type RomajiStyle, saveSetting, settings } from "../lib/settings";
@@ -155,22 +155,6 @@ export function Toolbar() {
             label={t("toolbar.symLabel")}
             title={t("toolbar.symTitle")}
           />
-          <label className="pref" title={t("toolbar.langTitle")}>
-            {t("toolbar.langLabel")}
-            <select
-              id="selLang"
-              value={locale}
-              onChange={(e) => {
-                try {
-                  localStorage.setItem(LOCALE_STORE_KEY, e.currentTarget.value);
-                } catch {}
-                location.reload();
-              }}
-            >
-              <option value="en">{t("toolbar.langEn")}</option>
-              <option value="ja">{t("toolbar.langJa")}</option>
-            </select>
-          </label>
         </div>
       </div>
     </div>
