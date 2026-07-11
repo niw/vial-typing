@@ -286,6 +286,77 @@ function guidedSymPool(
   return pool;
 }
 
+// common code identifiers, so the synthetic symbol lines read like real code instead of random letters
+const GUIDED_IDENTS = [
+  "name",
+  "value",
+  "count",
+  "index",
+  "list",
+  "item",
+  "data",
+  "node",
+  "next",
+  "size",
+  "total",
+  "label",
+  "state",
+  "error",
+  "token",
+  "line",
+  "word",
+  "code",
+  "text",
+  "file",
+  "path",
+  "time",
+  "type",
+  "mode",
+  "step",
+  "rate",
+  "score",
+  "level",
+  "result",
+  "input",
+  "offset",
+  "length",
+  "target",
+  "source",
+  "filter",
+  "cursor",
+  "string",
+  "number",
+  "object",
+  "array",
+  "entry",
+  "field",
+  "group",
+  "order",
+  "title",
+  "event",
+  "query",
+  "table",
+  "model",
+  "min",
+  "max",
+  "sum",
+  "temp",
+];
+
+// pick a real identifier spellable with the unlocked letters (preferring one containing the focus letter);
+// fall back to a random letter cluster only when no real identifier fits the unlocked letters yet
+function guidedIdent(letters: Set<string>, focus: string | null): string {
+  const fits = (word: string) => [...word].every((ch) => letters.has(ch));
+  let pool = GUIDED_IDENTS.filter(fits);
+  if (focus && guidedIsLetter(focus)) {
+    const withFocus = pool.filter((word) => word.includes(focus));
+    if (withFocus.length) pool = withFocus;
+  }
+  return pool.length
+    ? pool[Math.floor(Math.random() * pool.length)]
+    : guidedPseudoWord([...letters], focus).slice(0, 4);
+}
+
 // practice line joining unlocked-letter identifiers with unlocked symbols
 function guidedSymLine(
   letters: Set<string>,
@@ -295,7 +366,7 @@ function guidedSymLine(
 ): string {
   const symbolList = [...symbols];
   const pickSymbol = () => symbolList[Math.floor(Math.random() * symbolList.length)];
-  const ident = (focus: string | null) => guidedPseudoWord([...letters], focus).slice(0, 4);
+  const ident = (focus: string | null) => guidedIdent(letters, focus);
   let line = ident(letterFocus);
   const joints = 1 + Math.floor(Math.random() * 3);
   for (let i = 0; i < joints; i++) {
