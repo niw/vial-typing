@@ -6,6 +6,7 @@ import {
   type GuidedStep,
   guided,
   guidedBuildPools,
+  guidedPoolKey,
   guidedPreview,
   guidedRebuildStats,
   guidedRecordRun,
@@ -228,7 +229,16 @@ export const engine = {
     }
     if (this.guided && this.steps.length !== this.previewedSteps) {
       this.previewedSteps = this.steps.length;
+      const poolKey = guidedPoolKey();
       guidedPreview(this.steps); // live chart + mid-run unlock overlay (also invalidates)
+      // the unlock/focus state changed mid-run: rebuild the pools and replace the not-yet-typed items
+      // so the newly unlocked or newly focused key appears in the prompts immediately
+      if (guidedPoolKey() !== poolKey) {
+        guided.words = guidedBuildPools();
+        bags.g_en = bags.g_jp = bags.g_sym = [];
+        this.items = this.items.slice(0, this.idx + 1);
+        this.fillItems(10);
+      }
     } else {
       invalidate(); // update the remaining-time/WPM display
     }

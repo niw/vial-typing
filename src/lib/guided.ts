@@ -190,13 +190,32 @@ export function guidedUpdateKeys() {
 const guidedIncludedSet = (track: GuidedKey[]) => new Set(track.filter((k) => k.included).map((k) => k.ch));
 export const guidedFocusOf = (track: GuidedKey[]) => track.find((k) => k.focused)?.ch ?? null;
 
-// union of unlocked keys across all courses/tracks (used to diff for unlock announcements)
-function guidedIncludedAll() {
-  const set = new Set<string>();
+// per-track sets of unlocked keys, in a fixed course/track order (used to diff for unlock announcements).
+// NOTE: must diff per track, not as one union — a key can be unlocked from the start in one course
+// (e.g. "e" is the most frequent EN letter) and still be a fresh unlock in another.
+function guidedIncludedByTrack(): Set<string>[] {
+  const tracks: Set<string>[] = [];
+  for (const course of Object.values(guided.courses))
+    for (const track of [course.letters, course.symbols]) if (track) tracks.push(guidedIncludedSet(track));
+  return tracks;
+}
+
+// fingerprint of the state the word pools are built from (per-track unlocked keys + focus key);
+// when it changes mid-run the engine rebuilds the pools so new keys show up in the prompts immediately
+export function guidedPoolKey(): string {
+  const parts: string[] = [];
   for (const course of Object.values(guided.courses))
     for (const track of [course.letters, course.symbols])
-      if (track) for (const key of track) if (key.included) set.add(key.ch);
-  return set;
+      if (track)
+        parts.push(
+          track
+            .filter((k) => k.included)
+            .map((k) => k.ch)
+            .join("") +
+            ":" +
+            (guidedFocusOf(track) ?? ""),
+        );
+  return parts.join("|");
 }
 
 // build word pools typeable with only unlocked keys, per practice mode (equivalent to keybr's Dictionary.find)
@@ -424,7 +443,7 @@ export function guidedRecordRun(steps: GuidedStep[]): string[] {
   if (Object.keys(histogram).length < 3) return []; // don't record a run with too few distinct characters
   // read the unlock state as the user last saw it live (pending overlay still applied) so keys already
   // shown unlocking during the run aren't re-announced in the result dialog
-  const before = guidedIncludedAll();
+  const before = guidedIncludedByTrack();
   guided.pending = null; // drop the preview overlay so the committed run isn't counted twice
   guided.results.push({ t: Date.now(), h: histogram });
   if (guided.results.length > GUIDED_MAX_RESULTS) guided.results.splice(0, guided.results.length - GUIDED_MAX_RESULTS);
@@ -433,7 +452,8 @@ export function guidedRecordRun(steps: GuidedStep[]): string[] {
   guidedUpdateKeys();
   guided.rev++;
   invalidate();
-  return [...guidedIncludedAll()].filter((ch) => !before.has(ch));
+  const after = guidedIncludedByTrack();
+  return [...new Set(after.flatMap((track, i) => [...track].filter((ch) => !before[i]?.has(ch))))];
 }
 
 // overlay the in-progress run: recompute stats/unlock state as if the current keystrokes were a finished run,
