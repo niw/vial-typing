@@ -316,24 +316,31 @@ function guidedPseudoWord(letters: string[], focused: string | null): string {
   return word;
 }
 
-// aggregate a run's confirmed keystrokes into a per-key histogram (char -> [hits, misses, avg time-to-type ms])
+function guidedMedian(times: number[]): number {
+  if (!times.length) return 0;
+  const sorted = times.slice().sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return Math.round(sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+// aggregate a run's confirmed keystrokes into a per-key histogram (char -> [hits, misses, median time-to-type ms])
+// NOTE: the per-key time is the median, not the mean. Mid-word thinking pauses land on whichever key comes next,
+// and a couple of 1-2s hesitations push a key's mean past the target forever even when actually typing fast —
+// the median measures how fast the key is typically typed and is immune to those outliers.
 function guidedBuildHistogram(steps: GuidedStep[]): Record<string, [number, number, number]> {
-  const byChar = new Map<string, { hit: number; miss: number; time: number; count: number }>();
+  const byChar = new Map<string, { hit: number; miss: number; times: number[] }>();
   for (const step of steps) {
     const ch = step.ch.toLowerCase(); // count a shifted uppercase letter under the same physical key
     if (!guided.stats.has(ch)) continue;
     let s = byChar.get(ch);
-    if (!s) byChar.set(ch, (s = { hit: 0, miss: 0, time: 0, count: 0 }));
+    if (!s) byChar.set(ch, (s = { hit: 0, miss: 0, times: [] }));
     s.hit += 1;
     if (step.typo) s.miss += 1;
-    else if (step.time > 0) {
-      s.time += step.time;
-      s.count += 1;
-    }
+    else if (step.time > 0) s.times.push(step.time);
   }
   const histogram: Record<string, [number, number, number]> = {};
   for (const [ch, s] of byChar) {
-    const timeToType = s.count > 0 ? Math.round(s.time / s.count) : 0;
+    const timeToType = guidedMedian(s.times);
     if (timeToType > 0 && (timeToType < 40 || timeToType > 12000)) continue; // discard implausibly fast/slow samples (keybr's validateSample)
     histogram[ch] = [s.hit, s.miss, timeToType];
   }
