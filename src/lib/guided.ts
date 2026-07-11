@@ -243,9 +243,9 @@ export function guidedRefreshJpCourse() {
 // Japanese words whose standard romaji is typeable with only unlocked keys
 function guidedJpPool(included: Set<string>, focused: string | null): [string, string][] {
   const typeable = JP_WORDS.filter(([kana]) => [...guidedRomajiOf(kana)].every((ch) => included.has(ch)));
-  let pool = focused ? typeable.filter(([kana]) => guidedRomajiOf(kana).includes(focused)) : typeable;
-  if (pool.length < 5) pool = typeable;
-  pool = pool.slice();
+  // keep the focus filter and pad with focus pseudo-kana (like the EN pool) so the focus key is always
+  // practiceable; falling back to all typeable words here would starve the focus key and stall unlocking
+  const pool = focused ? typeable.filter(([kana]) => guidedRomajiOf(kana).includes(focused)) : typeable.slice();
   while (pool.length < 5) pool.push(guidedPseudoKana(included, focused));
   return pool;
 }
@@ -275,13 +275,13 @@ function guidedSymPool(
 ): string[] {
   const typeable = (item: string) =>
     [...item.toLowerCase()].every((ch) => ch === " " || (guidedIsLetter(ch) ? letters.has(ch) : symbols.has(ch)));
-  let pool = SYM_ITEMS.filter(typeable);
   const focus = symbolFocus ?? letterFocus;
-  if (focus) {
-    const withFocus = pool.filter((item) => item.toLowerCase().includes(focus));
-    if (withFocus.length) pool = withFocus;
-  }
-  pool = pool.slice();
+  // filter to the focus even when no real item contains it (like the EN pool), then pad with focus-injecting
+  // synthetic lines. Keeping all typeable items when the focus is absent would starve it and stall unlocking:
+  // a whole-line snippet containing e.g. "#" also needs symbols that aren't unlocked yet, so "#" never appears.
+  const pool = focus
+    ? SYM_ITEMS.filter((item) => typeable(item) && item.toLowerCase().includes(focus))
+    : SYM_ITEMS.filter(typeable);
   while (pool.length < 8) pool.push(guidedSymLine(letters, letterFocus, symbols, symbolFocus));
   return pool;
 }
