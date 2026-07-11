@@ -4,7 +4,8 @@ import { ROMAJI, tokenizeKana } from "./romaji";
 import { invalidate } from "./store";
 
 // A port of keybr.com's guided lesson: treats each run as one lesson, recording the average time-to-type per key.
-// Once the exponentially smoothed speed reaches the target, the next key unlocks in frequency order and the word pool updates.
+// A key is mastered once its fastest run reaches the target speed; once every unlocked key is mastered the next key
+// unlocks in frequency order and the word pool updates. (The smoothed speed is kept only for the "recent speed" display.)
 export const GUIDED_TARGET_TIME = 60000 / 175; // time per keystroke (ms) at the target speed of 175 CPM (=35 WPM)
 const GUIDED_MIN_KEYS = 6;
 const GUIDED_ALPHA = 0.1; // exponential smoothing coefficient
@@ -132,7 +133,10 @@ export function guidedRebuildStats() {
         stat.timeToType == null ? timeToType : GUIDED_ALPHA * timeToType + (1 - GUIDED_ALPHA) * stat.timeToType;
       stat.samples.push({ index, timeToType, filtered });
       stat.timeToType = filtered;
-      stat.bestTimeToType = Math.min(stat.bestTimeToType ?? Infinity, filtered);
+      // NOTE: best is the fastest actual run, not the fastest smoothed value. Smoothing lags the raw speed, so
+      // min-of-smoothed can never reach the target when a key hovers near it, permanently stalling the unlock;
+      // basing mastery on the best real run means a key counts as mastered once it's been typed at the target once.
+      stat.bestTimeToType = Math.min(stat.bestTimeToType ?? Infinity, timeToType);
     }
   });
   guided.stats = stats;
