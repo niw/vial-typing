@@ -52,7 +52,7 @@ test("saves keymap, practice records, and settings to a file, and restores them 
   await expect(page.locator("#status")).toHaveClass(/ok/);
 
   // Set the settings that restore will revert, to values different from the defaults
-  await page.getByRole("button", { name: "30s" }).click();
+  await page.selectOption("#selTime", "30");
   await page.selectOption("#selRomaji", "kunrei");
 
   // Save: capture the written Blob's contents and confirm it contains the version plus the keymap and practice records
@@ -83,14 +83,14 @@ test("saves keymap, practice records, and settings to a file, and restores them 
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await expect(page.locator("#status")).toContainText("default US keyboard");
-  await expect(page.getByRole("button", { name: "30s" })).not.toHaveClass(/active/); // settings are also back to default
+  await expect(page.locator("#selTime")).not.toHaveValue("30"); // settings are also back to default
   await expect(page.locator("#selRomaji")).toHaveValue("hepburn");
   await dropFile(page, backupText, "backup.json");
   await expect(page.locator("#status")).toContainText("Restored");
   await expect(page.locator("#status")).toHaveClass(/ok/);
 
   // Settings are also reflected in the UI
-  await expect(page.getByRole("button", { name: "30s" })).toHaveClass(/active/);
+  await expect(page.locator("#selTime")).toHaveValue("30");
   await expect(page.locator("#selRomaji")).toHaveValue("kunrei");
 
   // The restored state is also saved to localStorage and persists after reload
@@ -133,16 +133,16 @@ test("loads practice data and shows the start screen", async ({ page }) => {
 
 test("shows elapsed time in unlimited mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Unlimited" }).click();
+  await page.selectOption("#selTime", "0");
   await expect(page.locator("#stTimeLbl")).toHaveText("Elapsed");
   await expect(page.locator("#stTime")).toHaveText("0.0");
 });
 
 test("the selected play time persists after reload", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "30s" }).click();
+  await page.selectOption("#selTime", "30");
   await page.reload();
-  await expect(page.getByRole("button", { name: "30s" })).toHaveClass(/active/);
+  await expect(page.locator("#selTime")).toHaveValue("30");
   await expect(page.locator("#stTime")).toHaveText("30.0");
 });
 
@@ -204,19 +204,19 @@ test("shows finger numbers on the key to press and the hint", async ({ page }) =
 
 test("can select a practice mode even in key-mastery mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
   await expect(page.locator("#guided")).toBeVisible();
-  await page.getByRole("button", { name: "Japanese romaji" }).click();
+  await page.selectOption("#selMode", "jp");
   await expect(page.locator("#guided")).toBeVisible();
-  await page.getByRole("button", { name: "Symbols & layers" }).click();
+  await page.selectOption("#selMode", "sym");
   await expect(page.locator("#guided")).toBeVisible();
-  await page.getByRole("button", { name: "Normal" }).click();
+  await page.selectOption("#selPlaystyle", "normal");
   await expect(page.locator("#guided")).toBeHidden();
 });
 
 test("shows the key list and chart in key-mastery mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
   await expect(page.locator("#guided")).toBeVisible();
   await expect(page.locator("#keyset .gkey")).toHaveCount(26);
   await expect(page.locator("#keyset .gkey.locked")).toHaveCount(20);
@@ -228,7 +228,7 @@ test("shows the key list and chart in key-mastery mode", async ({ page }) => {
 
 test("unlocks the next key once all existing keys reach the target speed", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
   const baseKeys = await page.locator("#keyset .gkey:not(.locked)").allTextContents();
   expect(baseKeys).toHaveLength(6);
   await page.evaluate((letters) => {
@@ -237,7 +237,7 @@ test("unlocks the next key once all existing keys reach the target speed", async
     localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
   }, baseKeys);
   await page.reload();
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
   await expect(page.locator("#keyset .gkey:not(.locked)")).toHaveCount(7);
   await expect(page.locator("#keyset .gkey.focused")).toHaveCount(1);
 });
@@ -250,7 +250,7 @@ test("records keystrokes and colors keys during a key-mastery run", async ({ pag
   }, fakeKeymap());
   await page.reload();
   await expect(page.locator("#status")).toHaveClass(/ok/);
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
   await page.locator("#typeline").click();
   await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 }); // waiting for the 3-2-1 countdown
   for (let i = 0; i < 20; i++) {
@@ -273,7 +273,7 @@ test("updates the chart and unlock view live during a key-mastery run", async ({
   }, fakeKeymap());
   await page.reload();
   await expect(page.locator("#status")).toHaveClass(/ok/);
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
 
   // No records yet, so the unlocked keys start uncolored
   await expect(page.locator("#keyset .gkey.colored")).toHaveCount(0);
@@ -297,14 +297,14 @@ test("updates the chart and unlock view live during a key-mastery run", async ({
   expect(stored).toBeNull();
 
   // Aborting the run (switch to Normal, then back) reverts the overlay to committed data (none)
-  await page.getByRole("button", { name: "Normal" }).click();
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "normal");
+  await page.selectOption("#selPlaystyle", "guided");
   await expect(page.locator("#keyset .gkey.colored")).toHaveCount(0);
 });
 
 test("clicking a key chip pins the chart, clicking it again returns to auto-follow", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
 
   // Idle default: the chart follows the focus key
   const focused = ((await page.locator("#keyset .gkey.focused").textContent()) ?? "").trim();
@@ -336,8 +336,8 @@ test("records keystrokes during a Japanese run in key-mastery mode too", async (
   }, fakeKeymap());
   await page.reload();
   await expect(page.locator("#status")).toHaveClass(/ok/);
-  await page.getByRole("button", { name: "Key Mastery" }).click();
-  await page.getByRole("button", { name: "Japanese romaji" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
+  await page.selectOption("#selMode", "jp");
   await page.locator("#typeline").click();
   await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 });
   for (let i = 0; i < 20; i++) {
@@ -353,7 +353,7 @@ test("records keystrokes during a Japanese run in key-mastery mode too", async (
 
 test("unlock order differs per course, and the symbol course includes symbol keys", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
   const enOrder = await page.locator("#keyset .gkey").allTextContents();
   await page.getByRole("button", { name: "Japanese", exact: true }).click();
   const jpOrder = await page.locator("#keyset .gkey").allTextContents();
@@ -367,8 +367,8 @@ test("unlock order differs per course, and the symbol course includes symbol key
 
 test("the course display switches to match the practice mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Key Mastery" }).click();
-  await page.getByRole("button", { name: "Symbols & layers" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
+  await page.selectOption("#selMode", "sym");
   await expect(page.locator(".course-tabs button.active")).toHaveText("Symbols");
   await expect(page.locator("#keyset .keyrow")).toHaveCount(2);
 });
@@ -380,11 +380,32 @@ test("shows a prompt during a symbol run in key-mastery mode too", async ({ page
   }, fakeKeymap());
   await page.reload();
   await expect(page.locator("#status")).toHaveClass(/ok/);
-  await page.getByRole("button", { name: "Key Mastery" }).click();
-  await page.getByRole("button", { name: "Symbols & layers" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
+  await page.selectOption("#selMode", "sym");
   await page.locator("#typeline").click();
   await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 });
   await expect(page.locator("#typeline .cur")).not.toBeEmpty();
+});
+
+test("shows a prompt during a normal vim-mode run", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate((keymap) => {
+    localStorage.setItem("vialTypingKeymap", JSON.stringify(keymap));
+  }, fakeKeymap());
+  await page.reload();
+  await expect(page.locator("#status")).toHaveClass(/ok/);
+  await page.selectOption("#selMode", "vim");
+  await page.locator("#typeline").click();
+  await expect(page.locator("#typeline .cur")).toBeVisible({ timeout: 8000 });
+  await expect(page.locator("#typeline .cur")).not.toBeEmpty();
+});
+
+test("shows the Vim course with letter and symbol tracks in key-mastery mode", async ({ page }) => {
+  await page.goto("/");
+  await page.selectOption("#selPlaystyle", "guided");
+  await page.selectOption("#selMode", "vim");
+  await expect(page.locator(".course-tabs button.active")).toHaveText("Vim");
+  await expect(page.locator("#keyset .keyrow")).toHaveCount(2);
 });
 
 test("shows the all-unlocked state once every key reaches the target speed", async ({ page }) => {
@@ -395,7 +416,7 @@ test("shows the all-unlocked state once every key reaches the target speed", asy
     localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
   });
   await page.reload();
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
   await expect(page.locator("#keyset .gkey.locked")).toHaveCount(0);
   await expect(page.locator("#guidedStatus")).toContainText("All keys unlocked");
 });
@@ -408,7 +429,7 @@ test("the clear-history button reverts to the unlearned state", async ({ page })
     localStorage.setItem("vialTypingGuided", JSON.stringify({ v: 1, results: [{ t: 1, h: histogram }] }));
   });
   await page.reload();
-  await page.getByRole("button", { name: "Key Mastery" }).click();
+  await page.selectOption("#selPlaystyle", "guided");
   await expect(page.locator("#keyset .gkey.locked")).toHaveCount(0);
   page.on("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Clear history" }).click();

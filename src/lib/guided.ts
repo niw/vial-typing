@@ -1,5 +1,5 @@
 // Key-acquisition mode (keybr.com-style key unlocking): stats, unlock decisions, and word pools
-import { EN_SENTS, EN_WORDS, JP_WORDS, SYM_ITEMS } from "./data";
+import { EN_SENTS, EN_WORDS, JP_WORDS, SYM_ITEMS, VIM_ITEMS } from "./data";
 import { ROMAJI, tokenizeKana } from "./romaji";
 import { invalidate } from "./store";
 
@@ -35,7 +35,7 @@ interface GuidedCourseOrder {
   letters: string[];
   symbols?: string[];
 }
-const GUIDED_COURSES: Record<"en" | "jp" | "sym", GuidedCourseOrder> = {
+const GUIDED_COURSES: Record<"en" | "jp" | "sym" | "vim", GuidedCourseOrder> = {
   en: { letters: guidedFrequencyOrder(EN_WORDS.concat(EN_SENTS), guidedIsLetter) },
   jp: {
     letters: guidedFrequencyOrder(
@@ -46,6 +46,10 @@ const GUIDED_COURSES: Record<"en" | "jp" | "sym", GuidedCourseOrder> = {
   sym: {
     letters: guidedFrequencyOrder(SYM_ITEMS, guidedIsLetter),
     symbols: guidedFrequencyOrder(SYM_ITEMS, guidedIsSymbol),
+  },
+  vim: {
+    letters: guidedFrequencyOrder(VIM_ITEMS, guidedIsLetter),
+    symbols: guidedFrequencyOrder(VIM_ITEMS, guidedIsSymbol),
   },
 };
 
@@ -87,14 +91,14 @@ export interface GuidedStep {
   typo: boolean;
   time: number;
 }
-export type CourseId = "en" | "jp" | "sym";
+export type CourseId = "en" | "jp" | "sym" | "vim";
 
 export const guided = {
   results: [] as GuidedResult[],
   stats: new Map<string, GuidedStat>(),
   courses: {} as Record<CourseId, GuidedCourse>, // unlock state per course
   course: "en" as CourseId, // the course currently shown in the panel
-  words: { en: [] as string[], jp: [] as [string, string][], sym: [] as string[] }, // word pools per practice mode
+  words: { en: [] as string[], jp: [] as [string, string][], sym: [] as string[], vim: [] as string[] }, // word pools per practice mode
   selected: null as string | null,
   lastTyped: null as string | null, // the most recently typed key while running (follows the live chart); cleared when idle
   pending: null as GuidedResult | null, // in-progress run overlaid on the committed results for a live chart/unlock preview
@@ -184,6 +188,10 @@ export function guidedUpdateKeys() {
       letters: guidedTrackKeys(GUIDED_COURSES.sym.letters),
       symbols: guidedTrackKeys(GUIDED_COURSES.sym.symbols!),
     },
+    vim: {
+      letters: guidedTrackKeys(GUIDED_COURSES.vim.letters),
+      symbols: guidedTrackKeys(GUIDED_COURSES.vim.symbols!),
+    },
   };
 }
 
@@ -229,6 +237,12 @@ export function guidedBuildPools() {
       guidedFocusOf(courses.sym.letters),
       guidedIncludedSet(courses.sym.symbols!),
       guidedFocusOf(courses.sym.symbols!),
+    ),
+    vim: guidedVimPool(
+      guidedIncludedSet(courses.vim.letters),
+      guidedFocusOf(courses.vim.letters),
+      guidedIncludedSet(courses.vim.symbols!),
+      guidedFocusOf(courses.vim.symbols!),
     ),
   };
 }
@@ -285,8 +299,10 @@ function guidedPseudoKana(included: Set<string>, focused: string | null): [strin
   return [word, word];
 }
 
-// a symbol line where both letters and symbols fit within their own unlocked keys (generated from identifier+symbol when there's a shortfall)
-function guidedSymPool(
+// items where both letters and symbols fit within their own unlocked keys (generated from identifier+symbol when there's a shortfall).
+// Shared by the Symbols and Vim courses, which both mix letters and symbols within one corpus.
+function guidedItemPool(
+  items: string[],
   letters: Set<string>,
   letterFocus: string | null,
   symbols: Set<string>,
@@ -299,10 +315,28 @@ function guidedSymPool(
   // synthetic lines. Keeping all typeable items when the focus is absent would starve it and stall unlocking:
   // a whole-line snippet containing e.g. "#" also needs symbols that aren't unlocked yet, so "#" never appears.
   const pool = focus
-    ? SYM_ITEMS.filter((item) => typeable(item) && item.toLowerCase().includes(focus))
-    : SYM_ITEMS.filter(typeable);
+    ? items.filter((item) => typeable(item) && item.toLowerCase().includes(focus))
+    : items.filter(typeable);
   while (pool.length < 8) pool.push(guidedSymLine(letters, letterFocus, symbols, symbolFocus));
   return pool;
+}
+
+function guidedSymPool(
+  letters: Set<string>,
+  letterFocus: string | null,
+  symbols: Set<string>,
+  symbolFocus: string | null,
+): string[] {
+  return guidedItemPool(SYM_ITEMS, letters, letterFocus, symbols, symbolFocus);
+}
+
+function guidedVimPool(
+  letters: Set<string>,
+  letterFocus: string | null,
+  symbols: Set<string>,
+  symbolFocus: string | null,
+): string[] {
+  return guidedItemPool(VIM_ITEMS, letters, letterFocus, symbols, symbolFocus);
 }
 
 // common code identifiers, so the synthetic symbol lines read like real code instead of random letters

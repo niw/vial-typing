@@ -64,27 +64,35 @@
   flex-wrap: wrap;
 }
 
-.modes {
-  display: flex;
-  gap: 4px;
-}
-
-.times {
-  display: flex;
-  gap: 4px;
-}
-
-.playstyle {
-  display: flex;
-  gap: 4px;
-}
-
-.modes button,
-.times button,
-.playstyle button {
-  padding: 4px 8px;
-  font-size: 10.5px;
+.mode-select {
+  background: #fff;
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
   box-shadow: 0 2px 0 var(--border);
+}
+
+.mode-select:hover {
+  border-color: var(--accent);
+}
+
+.select-playstyle {
+  border-color: var(--accent);
+  box-shadow: 0 2px 0 #d94a78;
+}
+
+.select-mode {
+  border-color: var(--accent2);
+  box-shadow: 0 2px 0 #5e4fd4;
+}
+
+.select-time {
+  border-color: #18b566;
+  box-shadow: 0 2px 0 #0e8a4c;
 }
 
 .settings-row #btnSound {
@@ -102,27 +110,6 @@
   font-size: 10.5px;
 }
 
-.modes button.active {
-  background: linear-gradient(90deg, var(--accent2), #9d8ffa);
-  border-color: var(--accent2);
-  color: #fff;
-  box-shadow: 0 2px 0 #5e4fd4;
-}
-
-.times button.active {
-  background: linear-gradient(90deg, #18b566, #4dd694);
-  border-color: #18b566;
-  color: #fff;
-  box-shadow: 0 2px 0 #0e8a4c;
-}
-
-.playstyle button.active {
-  background: linear-gradient(90deg, var(--accent), #ff8fb0);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 2px 0 #d94a78;
-}
-
 @media (max-width: 640px) {
   .toolbar {
     gap: 10px 14px;
@@ -134,11 +121,9 @@
   .ctrl-label {
     font-size: 10px;
   }
-  .modes button,
-  .times button,
-  .playstyle button {
+  .mode-select {
     padding: 5px 9px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .pref {
     font-size: 11px;

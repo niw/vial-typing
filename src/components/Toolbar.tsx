@@ -12,6 +12,7 @@ const MODES = [
   ["en", t("toolbar.modeEn")],
   ["jp", t("toolbar.modeJp")],
   ["sym", t("toolbar.modeSym")],
+  ["vim", t("toolbar.modeVim")],
   ["mix", t("toolbar.modeMix")],
 ] as const;
 
@@ -27,53 +28,51 @@ export function Toolbar() {
     <div className="toolbar">
       <div className="ctrl-group">
         <span className="ctrl-label">{t("toolbar.modeLabel")}</span>
-        <div className="playstyle">
-          <button type="button" className={engine.guided ? "" : "active"} onClick={() => setGuided(false)}>
-            {t("toolbar.normal")}
-          </button>
-          <button
-            type="button"
-            className={engine.guided ? "active" : ""}
-            title={t("toolbar.keyMasteryTitle")}
-            onClick={() => setGuided(true)}
-          >
-            {t("toolbar.keyMastery")}
-          </button>
-        </div>
+        <select
+          id="selPlaystyle"
+          className="mode-select select-playstyle"
+          title={t("toolbar.keyMasteryTitle")}
+          value={engine.guided ? "guided" : "normal"}
+          onChange={(e) => setGuided(e.currentTarget.value === "guided")}
+        >
+          <option value="normal">{t("toolbar.normal")}</option>
+          <option value="guided">{t("toolbar.keyMastery")}</option>
+        </select>
       </div>
       <div className="ctrl-group">
         <span className="ctrl-label">{t("toolbar.practiceModeLabel")}</span>
-        <div className="modes">
+        <select
+          id="selMode"
+          className="mode-select select-mode"
+          value={engine.mode}
+          onChange={(e) => setMode(e.currentTarget.value)}
+        >
           {MODES.map(([mode, label]) => (
-            <button
-              type="button"
-              key={mode}
-              className={engine.mode === mode ? "active" : ""}
-              onClick={() => setMode(mode)}
-            >
+            <option key={mode} value={mode}>
               {label}
-            </button>
+            </option>
           ))}
-        </div>
+        </select>
       </div>
       <div className="ctrl-group">
         <span className="ctrl-label">{t("toolbar.playTimeLabel")}</span>
-        <div className="times">
+        <select
+          id="selTime"
+          className="mode-select select-time"
+          value={settings.runSeconds}
+          onChange={(e) => {
+            const seconds = +e.currentTarget.value;
+            settings.runSeconds = seconds;
+            saveSetting("cornixTime", String(seconds));
+            engine.idle();
+          }}
+        >
           {TIMES.map(([seconds, label]) => (
-            <button
-              type="button"
-              key={seconds}
-              className={settings.runSeconds === seconds ? "active" : ""}
-              onClick={() => {
-                settings.runSeconds = seconds;
-                saveSetting("cornixTime", String(seconds));
-                engine.idle();
-              }}
-            >
+            <option key={seconds} value={seconds}>
               {label}
-            </button>
+            </option>
           ))}
-        </div>
+        </select>
       </div>
       <div className="ctrl-group settings">
         <span className="ctrl-label">{t("toolbar.settingsLabel")}</span>

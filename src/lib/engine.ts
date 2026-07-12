@@ -1,7 +1,7 @@
 // Practice engine: a state machine for a run. Never touches the DOM; after a state change it calls
 // invalidate() to notify React to re-render (the type line, stats, and hints are all derived from state)
 import { audio } from "./audio";
-import { EN_SENTS, EN_WORDS, JP_SENTS, JP_WORDS, SYM_ITEMS } from "./data";
+import { EN_SENTS, EN_WORDS, JP_SENTS, JP_WORDS, SYM_ITEMS, VIM_ITEMS } from "./data";
 import {
   type GuidedStep,
   guided,
@@ -98,7 +98,7 @@ export const engine = {
     mode = mode || this.mode;
     if (mode === "mix") {
       const r = Math.random();
-      mode = r < 0.35 ? "en" : r < 0.7 ? "jp" : "sym";
+      mode = r < 0.25 ? "en" : r < 0.5 ? "jp" : r < 0.75 ? "sym" : "vim";
     }
     if (this.guided) {
       if (mode === "jp") {
@@ -106,6 +106,7 @@ export const engine = {
         return { kana: w[0], meta: w[1] };
       }
       if (mode === "sym") return { text: drawFrom(guided.words.sym, "g_sym"), meta: "" };
+      if (mode === "vim") return { text: drawFrom(guided.words.vim, "g_vim"), meta: "" };
       return { text: drawFrom(guided.words.en, "g_en"), meta: "" };
     }
     if (mode === "en")
@@ -113,6 +114,7 @@ export const engine = {
         ? { text: drawFrom(EN_SENTS, "ens"), meta: "" }
         : { text: drawFrom(EN_WORDS, "enw"), meta: "" };
     if (mode === "sym") return { text: drawFrom(SYM_ITEMS, "sym"), meta: "" };
+    if (mode === "vim") return { text: drawFrom(VIM_ITEMS, "vim"), meta: "" };
     const w = Math.random() < 0.15 ? drawFrom(JP_SENTS, "jps") : drawFrom(JP_WORDS, "jpw");
     return { kana: w[0], meta: w[1] };
   },
@@ -185,7 +187,7 @@ export const engine = {
       guidedRebuildStats();
       guidedUpdateKeys();
       guided.words = guidedBuildPools();
-      bags.g_en = bags.g_jp = bags.g_sym = [];
+      bags.g_en = bags.g_jp = bags.g_sym = bags.g_vim = [];
       this.steps = [];
       this.lastInputAt = 0;
       this.typoPending = false;
@@ -235,7 +237,7 @@ export const engine = {
       // so the newly unlocked or newly focused key appears in the prompts immediately
       if (guidedPoolKey() !== poolKey) {
         guided.words = guidedBuildPools();
-        bags.g_en = bags.g_jp = bags.g_sym = [];
+        bags.g_en = bags.g_jp = bags.g_sym = bags.g_vim = [];
         this.items = this.items.slice(0, this.idx + 1);
         this.fillItems(10);
       }

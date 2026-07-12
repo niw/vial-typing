@@ -1,0 +1,19 @@
+[
+  "h", "j", "k", "l", "0", "^", "$", "gg", "G", "w", "b", "e", "ge",
+  "3w", "5j", "4k", "10G", "42gg", "H", "M", "L", "{", "}", "%",
+  "f)", "F(", "t,", "T;", "fx", "dd", "yy", "cc", "5dd", "3yy",
+  "dw", "de", "db", "cw", "ce", "yw", "ye", "D", "C", "Y", "x", "X",
+  "s", "S", "rx", "R", "d$", "y$", "c$", "d0", "y0", "c^", "2cw",
+  "d3w", "y2j", "diw", "daw", "ciw", "caw", "yiw", "yaw", "di\"",
+  "da\"", "ci\"", "ca\"", "di'", "ci(", "ca(", "di(", "da(", "cit",
+  "cat", "dit", "dat", "yit", "yat", "vi(", "va(", "vi\"", "va\"",
+  ">>", "<<", "==", "gg=G", "~", "g~~", "guu", "gUU", "guiw", "gUiw",
+  "2>>", "u", "U", ".", "3.", "p", "P", "]p", "[p", "v", "V", "o",
+  "gv", "vip", "vap", "/foo", "?bar", "n", "N", "*", "#", ":noh",
+  ":s/foo/bar/", ":%s/foo/bar/g", ":%s/foo/bar/gc", "ma", "`a", "'a",
+  "``", "\"ayy", "\"ap", "\"+yy", "\"0p", "\"_dd", "qaq", "@a", "@@",
+  "5@a", ":sp", ":vsp", ":only", ":q", ":qa", ":wq", ":wqa", ":x",
+  ":w", ":w!", ":e!", ":bn", ":bp", ":bd", "zf", "zo", "zc", "za",
+  "zR", "zM", "J", "gJ", ":set nu", ":set nu!", ":set ic",
+  ":syntax on", ":1,5d", ":.,$d", ":g/foo/d", ":v/foo/d"
+]

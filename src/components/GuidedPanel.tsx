@@ -21,6 +21,7 @@ const COURSES: [CourseId, string][] = [
   ["en", t("guided.courseEn")],
   ["jp", t("guided.courseJp")],
   ["sym", t("guided.courseSym")],
+  ["vim", t("guided.courseVim")],
 ];
 
 export function GuidedPanel() {
