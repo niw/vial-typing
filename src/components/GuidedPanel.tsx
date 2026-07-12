@@ -147,6 +147,7 @@ function KeyInfo({ guidedKey: key }: { guidedKey: GuidedKey }) {
           {t("guided.infoConfBest", { pct: pct(key.confidence ?? 0) })}
           <b>{guidedWpm(key.bestTimeToType ?? 0)} WPM</b>
           {t("guided.infoBestPct", { pct: pct(key.bestConfidence ?? 0) })}
+          {key.accuracy != null && t("guided.infoAccuracy", { pct: pct(key.accuracy) })}
           {rate != null && t("guided.infoLearnRate", { rate: (rate >= 0 ? "+" : "") + rate.toFixed(1) })}
         </>
       )}

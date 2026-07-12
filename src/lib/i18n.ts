@@ -117,6 +117,7 @@ const en = {
     infoRecent: " Recent ",
     infoConfBest: " (confidence {{pct}}) · best ",
     infoBestPct: " ({{pct}})",
+    infoAccuracy: " · accuracy {{pct}}",
     infoLearnRate: " · learning rate {{rate}} WPM/run",
   },
 
@@ -347,6 +348,7 @@ const ja: typeof en = {
     infoRecent: " 直前 ",
     infoConfBest: "（信頼度 {{pct}}）・自己ベスト ",
     infoBestPct: "（{{pct}}）",
+    infoAccuracy: "・正確率 {{pct}}",
     infoLearnRate: "・学習率 {{rate}} WPM/走行",
   },
 

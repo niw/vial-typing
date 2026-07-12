@@ -18,6 +18,7 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
     grid: css.getPropertyValue("--border").trim() || "#eee",
     axis: css.getPropertyValue("--dim").trim() || "#999",
     dot: css.getPropertyValue("--accent2").trim() || "#7c6cf6",
+    miss: css.getPropertyValue("--bad").trim() || "#ff5252",
     curve: css.getPropertyValue("--accent").trim() || "#ff5d8f",
     target: css.getPropertyValue("--good").trim() || "#18b566",
     text: css.getPropertyValue("--dim").trim() || "#999",
@@ -116,11 +117,13 @@ export function drawKeyChart(canvas: HTMLCanvasElement, key: GuidedKey) {
     ctx.fillText(t("keyChart.now"), nx + 3, box.y - 2);
   }
 
-  // Per-run measured-speed scatter plot
-  ctx.fillStyle = colors.dot;
+  // Per-run measured-speed scatter plot. A run with mistypes on this key is drawn red and larger (scaled by how
+  // many strokes were mistyped), so a run that was fast but sloppy stands out from the clean runs.
   samples.forEach((s, i) => {
+    const missy = s.accuracy < 1;
+    ctx.fillStyle = missy ? colors.miss : colors.dot;
     ctx.beginPath();
-    ctx.arc(px(i + 1), py(12000 / s.timeToType), 2.5, 0, Math.PI * 2);
+    ctx.arc(px(i + 1), py(12000 / s.timeToType), 2.5 + (missy ? 2 * (1 - s.accuracy) : 0), 0, Math.PI * 2);
     ctx.fill();
   });
 

@@ -6,9 +6,14 @@ import { invalidate } from "./store";
 // A port of keybr.com's guided lesson: treats each run as one lesson, recording the average time-to-type per key.
 // A key is mastered once its fastest run reaches the target speed; once every unlocked key is mastered the next key
 // unlocks in frequency order and the word pool updates. (The smoothed speed is kept only for the "recent speed" display.)
+// Mistypes penalize a run's effective time (see GUIDED_MISS_PENALTY), so a key only masters on a run that was both
+// fast AND accurate; a key you keep mistyping stays the weakest unlocked key and so keeps driving the word pool.
 export const GUIDED_TARGET_TIME = 60000 / 175; // time per keystroke (ms) at the target speed of 175 CPM (=35 WPM)
 const GUIDED_MIN_KEYS = 6;
 const GUIDED_ALPHA = 0.1; // exponential smoothing coefficient
+// accuracy weight: how strongly a run's miss rate (misses/keystrokes, 0..1) inflates that run's effective
+// time-to-type. At 1, a key mistyped on every occurrence must be typed twice as fast to reach the target.
+const GUIDED_MISS_PENALTY = 1;
 const GUIDED_MAX_RESULTS = 300;
 export const GUIDED_STORE_KEY = "vialTypingGuided";
 const GUIDED_SLOW_COLOR = [0xcc, 0x00, 0x00];
@@ -65,13 +70,15 @@ export interface GuidedResult {
 }
 interface GuidedSample {
   index: number;
-  timeToType: number;
+  timeToType: number; // accuracy-adjusted (misses inflate it)
   filtered: number;
+  accuracy: number; // 1 - miss/hit for this run's key (drives the per-run dot color on the chart)
 }
 export interface GuidedStat {
   samples: GuidedSample[];
   timeToType: number | null;
   bestTimeToType: number | null;
+  accuracy: number | null; // smoothed accuracy across runs (for the key readout)
 }
 // unlock state of a single key on a track
 export interface GuidedKey extends GuidedStat {
@@ -124,22 +131,28 @@ const guidedConfidence = (timeToType: number | null) => (timeToType == null ? nu
 // recompute each key's smoothed time-to-type and personal best from all records (equivalent to keybr's MutableKeyStats)
 export function guidedRebuildStats() {
   const stats = new Map<string, GuidedStat>(
-    GUIDED_TRACKED.map((ch) => [ch, { samples: [], timeToType: null, bestTimeToType: null }]),
+    GUIDED_TRACKED.map((ch) => [ch, { samples: [], timeToType: null, bestTimeToType: null, accuracy: null }]),
   );
   // fold the in-progress run in as a trailing (uncommitted) sample so the chart and unlock state update live
   const runs = guided.pending ? [...guided.results, guided.pending] : guided.results;
   runs.forEach((result, index) => {
     for (const [ch, sample] of Object.entries(result.h) as [string, [number, number, number]][]) {
       const stat = stats.get(ch);
-      const timeToType = sample[2];
-      if (!stat || !(timeToType > 0)) continue;
+      const [hit, miss, rawTime] = sample;
+      if (!stat || !(rawTime > 0)) continue;
+      const missRate = hit > 0 ? miss / hit : 0;
+      const accuracy = 1 - missRate;
+      // fold accuracy into the time that feeds the unlock: a sloppy run reads as slower, so mastery needs a run
+      // that was both fast and accurate. Old runs already store per-key miss counts, so this applies retroactively.
+      const timeToType = rawTime * (1 + GUIDED_MISS_PENALTY * missRate);
       const filtered =
         stat.timeToType == null ? timeToType : GUIDED_ALPHA * timeToType + (1 - GUIDED_ALPHA) * stat.timeToType;
-      stat.samples.push({ index, timeToType, filtered });
+      stat.samples.push({ index, timeToType, filtered, accuracy });
       stat.timeToType = filtered;
-      // NOTE: best is the fastest actual run, not the fastest smoothed value. Smoothing lags the raw speed, so
-      // min-of-smoothed can never reach the target when a key hovers near it, permanently stalling the unlock;
-      // basing mastery on the best real run means a key counts as mastered once it's been typed at the target once.
+      stat.accuracy = stat.accuracy == null ? accuracy : GUIDED_ALPHA * accuracy + (1 - GUIDED_ALPHA) * stat.accuracy;
+      // NOTE: best is the fastest actual (accuracy-adjusted) run, not the fastest smoothed value. Smoothing lags the
+      // raw speed, so min-of-smoothed can never reach the target when a key hovers near it, permanently stalling the
+      // unlock; basing mastery on the best real run means a key counts as mastered once it's been typed fast and clean.
       stat.bestTimeToType = Math.min(stat.bestTimeToType ?? Infinity, timeToType);
     }
   });
@@ -155,6 +168,7 @@ function guidedTrackKeys(order: string[]): GuidedKey[] {
       samples: stat.samples,
       timeToType: stat.timeToType,
       bestTimeToType: stat.bestTimeToType,
+      accuracy: stat.accuracy,
       confidence: guidedConfidence(stat.timeToType),
       bestConfidence: guidedConfidence(stat.bestTimeToType),
       included: false,
